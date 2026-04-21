@@ -1,0 +1,690 @@
+--[[
+    Delta Hub - Исправленная версия
+    Для Delta Executor
+]]
+
+-- Проверяем, что скрипт запущен в игре
+repeat wait() until game:IsLoaded()
+
+-- Получаем сервисы
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local VirtualUser = game:GetService("VirtualUser")
+
+-- Переменные для функционала
+local flying = false
+local noclipEnabled = false
+local flySpeed = 50
+local originalSpeed = 16
+local bodyVelocity = nil
+local flyConnection = nil
+local playerList = {}
+local selectedPlayer = nil
+
+-- Создаем GUI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "DeltaHub"
+screenGui.ResetOnSpawn = false
+pcall(function() screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end)
+
+-- Если не получилось через PlayerGui, пробуем через CoreGui
+if not screenGui.Parent then
+    screenGui.Parent = game:GetService("CoreGui")
+end
+
+-- Главное окно
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 380, 0, 500)
+mainFrame.Position = UDim2.new(0.5, -190, 0.5, -250)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+mainFrame.BackgroundTransparency = 0.1
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+-- Закругление
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0, 10)
+mainCorner.Parent = mainFrame
+
+-- Тень (опционально)
+local shadow = Instance.new("Frame")
+shadow.Size = UDim2.new(1, 10, 1, 10)
+shadow.Position = UDim2.new(0, -5, 0, -5)
+shadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+shadow.BackgroundTransparency = 0.5
+shadow.BorderSizePixel = 0
+shadow.ZIndex = 0
+shadow.Parent = mainFrame
+
+local shadowCorner = Instance.new("UICorner")
+shadowCorner.CornerRadius = UDim.new(0, 10)
+shadowCorner.Parent = shadow
+
+-- Заголовок
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 45)
+titleBar.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+titleBar.BorderSizePixel = 0
+titleBar.Parent = mainFrame
+
+local titleCorner = Instance.new("UICorner")
+titleCorner.CornerRadius = UDim.new(0, 10)
+titleCorner.Parent = titleBar
+
+local titleText = Instance.new("TextLabel")
+titleText.Size = UDim2.new(1, -50, 1, 0)
+titleText.Position = UDim2.new(0, 15, 0, 0)
+titleText.BackgroundTransparency = 1
+titleText.Text = "🔷 Delta Hub | v2.0"
+titleText.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleText.TextSize = 18
+titleText.Font = Enum.Font.GothamBold
+titleText.TextXAlignment = Enum.TextXAlignment.Left
+titleText.Parent = titleBar
+
+-- Кнопка закрытия
+local closeButton = Instance.new("TextButton")
+closeButton.Size = UDim2.new(0, 35, 0, 35)
+closeButton.Position = UDim2.new(1, -40, 0, 5)
+closeButton.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+closeButton.Text = "✕"
+closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeButton.TextSize = 20
+closeButton.Font = Enum.Font.GothamBold
+closeButton.BorderSizePixel = 0
+closeButton.Parent = titleBar
+
+local closeCorner = Instance.new("UICorner")
+closeCorner.CornerRadius = UDim.new(0, 8)
+closeCorner.Parent = closeButton
+
+-- Создаем вкладки
+local tabContainer = Instance.new("Frame")
+tabContainer.Size = UDim2.new(1, 0, 0, 40)
+tabContainer.Position = UDim2.new(0, 0, 0, 45)
+tabContainer.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
+tabContainer.BorderSizePixel = 0
+tabContainer.Parent = mainFrame
+
+-- Контейнер для содержимого вкладок
+local contentContainer = Instance.new("Frame")
+contentContainer.Size = UDim2.new(1, 0, 1, -85)
+contentContainer.Position = UDim2.new(0, 0, 0, 85)
+contentContainer.BackgroundTransparency = 1
+contentContainer.Parent = mainFrame
+
+-- Вкладки
+local tabs = {}
+local currentTab = nil
+
+local function createTab(name, index)
+    local tab = Instance.new("TextButton")
+    tab.Size = UDim2.new(0.25, 0, 1, 0)
+    tab.Position = UDim2.new((index - 1) * 0.25, 0, 0, 0)
+    tab.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    tab.Text = name
+    tab.TextColor3 = Color3.fromRGB(200, 200, 200)
+    tab.TextSize = 14
+    tab.Font = Enum.Font.GothamSemibold
+    tab.BorderSizePixel = 0
+    tab.Parent = tabContainer
+    
+    local tabCorner = Instance.new("UICorner")
+    tabCorner.CornerRadius = UDim.new(0, 5)
+    tabCorner.Parent = tab
+    
+    -- Контент для вкладки
+    local content = Instance.new("ScrollingFrame")
+    content.Size = UDim2.new(1, -20, 1, -10)
+    content.Position = UDim2.new(0, 10, 0, 5)
+    content.BackgroundTransparency = 1
+    content.ScrollBarThickness = 5
+    content.CanvasSize = UDim2.new(0, 0, 0, 0)
+    content.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    content.Visible = false
+    content.Parent = contentContainer
+    
+    local contentLayout = Instance.new("UIListLayout")
+    contentLayout.Padding = UDim.new(0, 8)
+    contentLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    contentLayout.Parent = content
+    
+    tabs[name] = {button = tab, content = content}
+    
+    tab.MouseButton1Click:Connect(function()
+        if currentTab then
+            tabs[currentTab].content.Visible = false
+            tabs[currentTab].button.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+            tabs[currentTab].button.TextColor3 = Color3.fromRGB(200, 200, 200)
+        end
+        currentTab = name
+        content.Visible = true
+        tab.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+        tab.TextColor3 = Color3.fromRGB(255, 255, 255)
+    end)
+    
+    return content
+end
+
+-- Функции для создания элементов
+local function createButton(parent, text, color, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -20, 0, 40)
+    btn.Position = UDim2.new(0, 10, 0, 0)
+    btn.BackgroundColor3 = color or Color3.fromRGB(55, 55, 65)
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextSize = 14
+    btn.Font = Enum.Font.Gotham
+    btn.BorderSizePixel = 0
+    btn.Parent = parent
+    
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 6)
+    btnCorner.Parent = btn
+    
+    btn.MouseButton1Click:Connect(callback)
+    return btn
+end
+
+local function createToggle(parent, text, getter, setter)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1, -20, 0, 45)
+    container.Position = UDim2.new(0, 10, 0, 0)
+    container.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+    container.BorderSizePixel = 0
+    container.Parent = parent
+    
+    local containerCorner = Instance.new("UICorner")
+    containerCorner.CornerRadius = UDim.new(0, 6)
+    containerCorner.Parent = container
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.7, -10, 1, 0)
+    label.Position = UDim2.new(0, 10, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.TextSize = 14
+    label.Font = Enum.Font.Gotham
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = container
+    
+    local toggle = Instance.new("TextButton")
+    toggle.Size = UDim2.new(0, 70, 0, 30)
+    toggle.Position = UDim2.new(1, -80, 0.5, -15)
+    toggle.BackgroundColor3 = getter() and Color3.fromRGB(76, 175, 80) or Color3.fromRGB(220, 60, 60)
+    toggle.Text = getter() and "ВКЛ" or "ВЫКЛ"
+    toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    toggle.TextSize = 12
+    toggle.Font = Enum.Font.GothamBold
+    toggle.BorderSizePixel = 0
+    toggle.Parent = container
+    
+    local toggleCorner = Instance.new("UICorner")
+    toggleCorner.CornerRadius = UDim.new(1, 0)
+    toggleCorner.Parent = toggle
+    
+    toggle.MouseButton1Click:Connect(function()
+        local newVal = not getter()
+        setter(newVal)
+        toggle.BackgroundColor3 = newVal and Color3.fromRGB(76, 175, 80) or Color3.fromRGB(220, 60, 60)
+        toggle.Text = newVal and "ВКЛ" or "ВЫКЛ"
+    end)
+end
+
+local function createSlider(parent, text, minVal, maxVal, getter, setter)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1, -20, 0, 70)
+    container.Position = UDim2.new(0, 10, 0, 0)
+    container.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+    container.BorderSizePixel = 0
+    container.Parent = parent
+    
+    local containerCorner = Instance.new("UICorner")
+    containerCorner.CornerRadius = UDim.new(0, 6)
+    containerCorner.Parent = container
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -20, 0, 25)
+    label.Position = UDim2.new(0, 10, 0, 5)
+    label.BackgroundTransparency = 1
+    label.Text = text .. ": " .. string.format("%.1f", getter())
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.TextSize = 13
+    label.Font = Enum.Font.Gotham
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = container
+    
+    local sliderBg = Instance.new("Frame")
+    sliderBg.Size = UDim2.new(1, -30, 0, 5)
+    sliderBg.Position = UDim2.new(0, 15, 0, 45)
+    sliderBg.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    sliderBg.BorderSizePixel = 0
+    sliderBg.Parent = container
+    
+    local sliderBgCorner = Instance.new("UICorner")
+    sliderBgCorner.CornerRadius = UDim.new(1, 0)
+    sliderBgCorner.Parent = sliderBg
+    
+    local sliderFill = Instance.new("Frame")
+    sliderFill.Size = UDim2.new((getter() - minVal) / (maxVal - minVal), 0, 1, 0)
+    sliderFill.BackgroundColor3 = Color3.fromRGB(76, 175, 80)
+    sliderFill.BorderSizePixel = 0
+    sliderFill.Parent = sliderBg
+    
+    local sliderFillCorner = Instance.new("UICorner")
+    sliderFillCorner.CornerRadius = UDim.new(1, 0)
+    sliderFillCorner.Parent = sliderFill
+    
+    local valueText = Instance.new("TextLabel")
+    valueText.Size = UDim2.new(0, 50, 0, 25)
+    valueText.Position = UDim2.new(1, -60, 0, 5)
+    valueText.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+    valueText.Text = string.format("%.0f", getter())
+    valueText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    valueText.TextSize = 12
+    valueText.Font = Enum.Font.GothamBold
+    valueText.BorderSizePixel = 0
+    valueText.Parent = container
+    
+    local valueCorner = Instance.new("UICorner")
+    valueCorner.CornerRadius = UDim.new(0, 4)
+    valueCorner.Parent = valueText
+    
+    local dragging = false
+    
+    local function updateValue(value)
+        value = math.clamp(value, minVal, maxVal)
+        setter(value)
+        label.Text = text .. ": " .. string.format("%.1f", value)
+        valueText.Text = string.format("%.0f", value)
+        local percent = (value - minVal) / (maxVal - minVal)
+        sliderFill.Size = UDim2.new(percent, 0, 1, 0)
+    end
+    
+    sliderBg.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            local percent = math.clamp((input.Position.X - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X, 0, 1)
+            updateValue(minVal + percent * (maxVal - minVal))
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local percent = math.clamp((UserInputService:GetMouseLocation().X - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X, 0, 1)
+            updateValue(minVal + percent * (maxVal - minVal))
+        end
+    end)
+    
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+end
+
+-- ============ ФУНКЦИОНАЛ ============
+
+-- Функция для получения персонажа игрока
+local function getCharacter(plr)
+    if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+        return plr.Character
+    end
+    return nil
+end
+
+-- Teleport
+local function teleportToPlayer(target)
+    local localChar = getCharacter(LocalPlayer)
+    local targetChar = getCharacter(target)
+    
+    if localChar and targetChar then
+        localChar.HumanoidRootPart.CFrame = targetChar.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
+    end
+end
+
+-- Fling
+local function flingPlayer(target)
+    local targetChar = getCharacter(target)
+    if targetChar and targetChar:FindFirstChild("HumanoidRootPart") then
+        local hrp = targetChar.HumanoidRootPart
+        local bv = Instance.new("BodyVelocity")
+        bv.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+        bv.Velocity = Vector3.new(1e5, 1e5, 1e5)
+        bv.Parent = hrp
+        game:GetService("Debris"):AddItem(bv, 0.3)
+    end
+end
+
+-- Fly
+local function enableFly()
+    if flying then return end
+    flying = true
+    
+    local char = LocalPlayer.Character
+    if not char then return end
+    
+    local humanoid = char:FindFirstChild("Humanoid")
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    
+    if not humanoid or not hrp then return end
+    
+    originalSpeed = humanoid.WalkSpeed
+    
+    humanoid.PlatformStand = true
+    
+    bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+    bodyVelocity.Parent = hrp
+    
+    flyConnection = RunService.RenderStepped:Connect(function()
+        if not flying or not char or not char.Parent then return end
+        
+        local camera = workspace.CurrentCamera
+        local moveDir = Vector3.new(0, 0, 0)
+        
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            moveDir = moveDir + camera.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+            moveDir = moveDir - camera.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+            moveDir = moveDir + camera.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+            moveDir = moveDir - camera.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            moveDir = moveDir + Vector3.new(0, 1, 0)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+            moveDir = moveDir - Vector3.new(0, 1, 0)
+        end
+        
+        if moveDir.Magnitude > 0 then
+            moveDir = moveDir.Unit * flySpeed
+        end
+        
+        if bodyVelocity then
+            bodyVelocity.Velocity = moveDir
+        end
+    end)
+end
+
+local function disableFly()
+    if not flying then return end
+    flying = false
+    
+    local char = LocalPlayer.Character
+    if char then
+        local humanoid = char:FindFirstChild("Humanoid")
+        if humanoid then
+            humanoid.PlatformStand = false
+            humanoid.WalkSpeed = originalSpeed
+        end
+    end
+    
+    if bodyVelocity then
+        bodyVelocity:Destroy()
+        bodyVelocity = nil
+    end
+    
+    if flyConnection then
+        flyConnection:Disconnect()
+        flyConnection = nil
+    end
+end
+
+-- NoClip
+local function enableNoclip()
+    if noclipEnabled then return end
+    noclipEnabled = true
+    
+    local function applyNoclip(character)
+        for _, part in pairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end
+    
+    local char = LocalPlayer.Character
+    if char then
+        applyNoclip(char)
+    end
+    
+    LocalPlayer.CharacterAdded:Connect(function(character)
+        character:WaitForChild("HumanoidRootPart")
+        if noclipEnabled then
+            applyNoclip(character)
+        end
+    end)
+end
+
+local function disableNoclip()
+    noclipEnabled = false
+    
+    local char = LocalPlayer.Character
+    if char then
+        for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = true
+            end
+        end
+    end
+end
+
+-- WalkSpeed
+local function setWalkSpeed(speed)
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("Humanoid") then
+        char.Humanoid.WalkSpeed = speed
+    end
+end
+
+-- ============ СОЗДАНИЕ ВКЛАДОК И ЭЛЕМЕНТОВ ============
+
+-- Вкладка "Teleport"
+local teleportTab = createTab("📍 ТП", 1)
+
+local teleportLabel = Instance.new("TextLabel")
+teleportLabel.Size = UDim2.new(1, -20, 0, 30)
+teleportLabel.Position = UDim2.new(0, 10, 0, 0)
+teleportLabel.BackgroundTransparency = 1
+teleportLabel.Text = "Выберите игрока для телепортации:"
+teleportLabel.TextColor3 = Color3.fromRGB(180, 180, 200)
+teleportLabel.TextSize = 13
+teleportLabel.Font = Enum.Font.Gotham
+teleportLabel.TextXAlignment = Enum.TextXAlignment.Left
+teleportLabel.Parent = teleportTab
+
+local playersListFrame = Instance.new("ScrollingFrame")
+playersListFrame.Size = UDim2.new(1, -20, 0, 300)
+playersListFrame.Position = UDim2.new(0, 10, 0, 40)
+playersListFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+playersListFrame.BackgroundTransparency = 0.3
+playersListFrame.BorderSizePixel = 0
+playersListFrame.ScrollBarThickness = 5
+playersListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+playersListFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+playersListFrame.Parent = teleportTab
+
+local playersListCorner = Instance.new("UICorner")
+playersListCorner.CornerRadius = UDim.new(0, 6)
+playersListCorner.Parent = playersListFrame
+
+local playersListLayout = Instance.new("UIListLayout")
+playersListLayout.Padding = UDim.new(0, 5)
+playersListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+playersListLayout.Parent = playersListFrame
+
+local function updatePlayersUI()
+    for _, child in pairs(playersListFrame:GetChildren()) do
+        if child:IsA("TextButton") then
+            child:Destroy()
+        end
+    end
+    
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, -10, 0, 40)
+            btn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+            btn.Text = "🎮 " .. player.Name
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            btn.TextSize = 14
+            btn.Font = Enum.Font.Gotham
+            btn.BorderSizePixel = 0
+            btn.Parent = playersListFrame
+            
+            local btnCorner = Instance.new("UICorner")
+            btnCorner.CornerRadius = UDim.new(0, 6)
+            btnCorner.Parent = btn
+            
+            btn.MouseButton1Click:Connect(function()
+                teleportToPlayer(player)
+            end)
+        end
+    end
+end
+
+updatePlayersUI()
+Players.PlayerAdded:Connect(updatePlayersUI)
+Players.PlayerRemoving:Connect(updatePlayersUI)
+
+-- Вкладка "Fling"
+local flingTab = createTab("💥 Флинг", 2)
+
+local flingLabel = Instance.new("TextLabel")
+flingLabel.Size = UDim2.new(1, -20, 0, 30)
+flingLabel.Position = UDim2.new(0, 10, 0, 0)
+flingLabel.BackgroundTransparency = 1
+flingLabel.Text = "Выберите игрока для флинга:"
+flingLabel.TextColor3 = Color3.fromRGB(180, 180, 200)
+flingLabel.TextSize = 13
+flingLabel.Font = Enum.Font.Gotham
+flingLabel.TextXAlignment = Enum.TextXAlignment.Left
+flingLabel.Parent = flingTab
+
+local flingListFrame = Instance.new("ScrollingFrame")
+flingListFrame.Size = UDim2.new(1, -20, 0, 300)
+flingListFrame.Position = UDim2.new(0, 10, 0, 40)
+flingListFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+flingListFrame.BackgroundTransparency = 0.3
+flingListFrame.BorderSizePixel = 0
+flingListFrame.ScrollBarThickness = 5
+flingListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+flingListFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+flingListFrame.Parent = flingTab
+
+local flingListCorner = Instance.new("UICorner")
+flingListCorner.CornerRadius = UDim.new(0, 6)
+flingListCorner.Parent = flingListFrame
+
+local flingListLayout = Instance.new("UIListLayout")
+flingListLayout.Padding = UDim.new(0, 5)
+flingListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+flingListLayout.Parent = flingListFrame
+
+local function updateFlingUI()
+    for _, child in pairs(flingListFrame:GetChildren()) do
+        if child:IsA("TextButton") then
+            child:Destroy()
+        end
+    end
+    
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, -10, 0, 40)
+            btn.BackgroundColor3 = Color3.fromRGB(70, 45, 45)
+            btn.Text = "⚡ " .. player.Name
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            btn.TextSize = 14
+            btn.Font = Enum.Font.Gotham
+            btn.BorderSizePixel = 0
+            btn.Parent = flingListFrame
+            
+            local btnCorner = Instance.new("UICorner")
+            btnCorner.CornerRadius = UDim.new(0, 6)
+            btnCorner.Parent = btn
+            
+            btn.MouseButton1Click:Connect(function()
+                flingPlayer(player)
+            end)
+        end
+    end
+end
+
+updateFlingUI()
+Players.PlayerAdded:Connect(updateFlingUI)
+Players.PlayerRemoving:Connect(updateFlingUI)
+
+-- Вкладка "Movement"
+local moveTab = createTab("🏃 Движение", 3)
+
+createToggle(moveTab, "Режим полёта (WASD + Space/Ctrl)", function() return flying end, function(v)
+    if v then enableFly() else disableFly() end
+end)
+
+createSlider(moveTab, "Скорость полёта", 10, 300, function() return flySpeed end, function(v)
+    flySpeed = v
+end)
+
+createToggle(moveTab, "NoClip (проход сквозь стены)", function() return noclipEnabled end, function(v)
+    if v then enableNoclip() else disableNoclip() end
+end)
+
+createSlider(moveTab, "Скорость ходьбы", 16, 250, 
+    function() 
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("Humanoid") then
+            return char.Humanoid.WalkSpeed
+        end
+        return 16
+    end,
+    function(v) setWalkSpeed(v) end
+)
+
+createButton(moveTab, "🔄 Сбросить скорость (16)", Color3.fromRGB(70, 70, 80), function()
+    setWalkSpeed(16)
+end)
+
+-- Вкладка "Info"
+local infoTab = createTab("ℹ️ Инфо", 4)
+
+local infoText = Instance.new("TextLabel")
+infoText.Size = UDim2.new(1, -20, 0, 200)
+infoText.Position = UDim2.new(0, 10, 0, 10)
+infoText.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+infoText.BackgroundTransparency = 0.3
+infoText.Text = "Delta Hub v2.0\n\nРазработан для Delta Executor\n\nУправление:\n• W/A/S/D - движение в полёте\n• Пробел - вверх\n• Ctrl - вниз\n\nСкрипт создан для ознакомительных целей"
+infoText.TextColor3 = Color3.fromRGB(200, 200, 220)
+infoText.TextSize = 13
+infoText.Font = Enum.Font.Gotham
+infoText.TextWrapped = true
+infoText.Parent = infoTab
+
+local infoCorner = Instance.new("UICorner")
+infoCorner.CornerRadius = UDim.new(0, 8)
+infoCorner.Parent = infoText
+
+-- Активируем первую вкладку
+tabs["📍 ТП"].button.MouseButton1Click:Fire()
+
+-- Закрытие скрипта
+closeButton.MouseButton1Click:Connect(function()
+    if flying then disableFly() end
+    if noclipEnabled then disableNoclip() end
+    screenGui:Destroy()
+end)
+
+print("✅ Delta Hub успешно загружен!")
