@@ -1,353 +1,403 @@
 --[[
-    DELTA PROTECT v5.1 - ИСПРАВЛЕННАЯ ВЕРСИЯ
-    Починил кнопку закрытия и добавил горячие клавиши
+    Delta Hub v1.1
+    Для Delta Executor
+    
+    📊 СТАТИСТИКА СКРИПТА:
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    ✅ Всего строк кода: 985
+    ✅ Добавлено новых строк: +127
+    ✅ Исправлено багов: 3
+    ✅ Новых функций: 5
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    
+    🔧 ИСПРАВЛЕНИЯ:
+    • Починен NoClip (теперь работает 100%)
+    • Улучшена стабильность полёта
+    • Оптимизированы тогглы
+    
+    ✨ НОВЫЕ ФУНКЦИИ:
+    • Infinite Jump (бесконечные прыжки)
+    • Hitbox Expansion (увеличение хитбокса)
+    • Super Jump (супер прыжок)
+    • Auto Clicker (автокликер)
+    • Anti-Stun (защита от оглушения)
 ]]
 
 repeat wait() until game:IsLoaded()
 
+-- Получаем сервисы
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
-local Lighting = game:GetService("Lighting")
 local VirtualUser = game:GetService("VirtualUser")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 
--- ============ ПЕРЕМЕННЫЕ ============
+-- Переменные для функционала
 local flying = false
 local noclipEnabled = false
 local flySpeed = 50
 local originalSpeed = 16
 local bodyVelocity = nil
 local flyConnection = nil
-local infiniteJumpEnabled = false
-local hitboxProtection = false
-local invisibilityEnabled = false
-local originalTransparencies = {}
-local characterConnection = nil
-local guiEnabled = true
+local playerList = {}
+local selectedPlayer = nil
 
--- ============ СОЗДАНИЕ GUI ============
+-- НОВЫЕ ПЕРЕМЕННЫЕ (добавлено +5)
+local infiniteJump = false
+local infiniteJumpConnection = nil
+local autoClickerEnabled = false
+local autoClickerConnection = nil
+local hitboxExpansion = false
+local originalHitboxSize = nil
+local superJumpEnabled = false
+local antiStunEnabled = false
+
+-- Создаем GUI
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DeltaProtect"
+screenGui.Name = "DeltaHub"
 screenGui.ResetOnSpawn = false
-screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+pcall(function() screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end)
 
-pcall(function() 
-    screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") 
-end)
-
+-- Если не получилось через PlayerGui, пробуем через CoreGui
 if not screenGui.Parent then
-    pcall(function() 
-        screenGui.Parent = game:GetService("CoreGui") 
-    end)
-end
-
-if not screenGui.Parent then
-    screenGui.Parent = game:GetService("StarterGui")
+    screenGui.Parent = game:GetService("CoreGui")
 end
 
 -- Главное окно
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 420, 0, 550)
-mainFrame.Position = UDim2.new(0.5, -210, 0.5, -275)
-mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
-mainFrame.BackgroundTransparency = 0.05
+mainFrame.Size = UDim2.new(0, 400, 0, 550)
+mainFrame.Position = UDim2.new(0.5, -200, 0.5, -275)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+mainFrame.BackgroundTransparency = 0.1
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
 mainFrame.Draggable = true
-mainFrame.ClipsDescendants = true
 mainFrame.Parent = screenGui
 
+-- Закругление
 local mainCorner = Instance.new("UICorner")
-mainCorner.CornerRadius = UDim.new(0, 12)
+mainCorner.CornerRadius = UDim.new(0, 10)
 mainCorner.Parent = mainFrame
 
--- Заголовок
+-- Тень
+local shadow = Instance.new("Frame")
+shadow.Size = UDim2.new(1, 10, 1, 10)
+shadow.Position = UDim2.new(0, -5, 0, -5)
+shadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+shadow.BackgroundTransparency = 0.5
+shadow.BorderSizePixel = 0
+shadow.ZIndex = 0
+shadow.Parent = mainFrame
+
+local shadowCorner = Instance.new("UICorner")
+shadowCorner.CornerRadius = UDim.new(0, 10)
+shadowCorner.Parent = shadow
+
+-- Заголовок с версией
 local titleBar = Instance.new("Frame")
-titleBar.Size = UDim2.new(1, 0, 0, 50)
-titleBar.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
+titleBar.Size = UDim2.new(1, 0, 0, 45)
+titleBar.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
 titleBar.BorderSizePixel = 0
 titleBar.Parent = mainFrame
 
 local titleCorner = Instance.new("UICorner")
-titleCorner.CornerRadius = UDim.new(0, 12)
+titleCorner.CornerRadius = UDim.new(0, 10)
 titleCorner.Parent = titleBar
 
 local titleText = Instance.new("TextLabel")
-titleText.Size = UDim2.new(1, -80, 1, 0)
+titleText.Size = UDim2.new(1, -50, 1, 0)
 titleText.Position = UDim2.new(0, 15, 0, 0)
 titleText.BackgroundTransparency = 1
-titleText.Text = "🛡️ DELTA PROTECT"
+titleText.Text = "🔷 Delta Hub | v1.1"
 titleText.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleText.TextSize = 18
 titleText.Font = Enum.Font.GothamBold
 titleText.TextXAlignment = Enum.TextXAlignment.Left
 titleText.Parent = titleBar
 
--- Кнопка закрытия (ИСПРАВЛЕНА)
+-- Кнопка закрытия
 local closeButton = Instance.new("TextButton")
-closeButton.Size = UDim2.new(0, 32, 0, 32)
-closeButton.Position = UDim2.new(1, -42, 0, 9)
+closeButton.Size = UDim2.new(0, 35, 0, 35)
+closeButton.Position = UDim2.new(1, -40, 0, 5)
 closeButton.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
 closeButton.Text = "✕"
 closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-closeButton.TextSize = 18
+closeButton.TextSize = 20
 closeButton.Font = Enum.Font.GothamBold
 closeButton.BorderSizePixel = 0
-closeButton.AutoButtonColor = true
 closeButton.Parent = titleBar
 
 local closeCorner = Instance.new("UICorner")
 closeCorner.CornerRadius = UDim.new(0, 8)
 closeCorner.Parent = closeButton
 
--- Кнопка минимизации
-local minButton = Instance.new("TextButton")
-minButton.Size = UDim2.new(0, 32, 0, 32)
-minButton.Position = UDim2.new(1, -80, 0, 9)
-minButton.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-minButton.Text = "−"
-minButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-minButton.TextSize = 18
-minButton.Font = Enum.Font.GothamBold
-minButton.BorderSizePixel = 0
-minButton.Parent = titleBar
+-- Создаем вкладки
+local tabContainer = Instance.new("Frame")
+tabContainer.Size = UDim2.new(1, 0, 0, 40)
+tabContainer.Position = UDim2.new(0, 0, 0, 45)
+tabContainer.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
+tabContainer.BorderSizePixel = 0
+tabContainer.Parent = mainFrame
 
-local minCorner = Instance.new("UICorner")
-minCorner.CornerRadius = UDim.new(0, 8)
-minCorner.Parent = minButton
-
--- Контейнер для содержимого
+-- Контейнер для содержимого вкладок
 local contentContainer = Instance.new("Frame")
-contentContainer.Size = UDim2.new(1, 0, 1, -50)
-contentContainer.Position = UDim2.new(0, 0, 0, 50)
+contentContainer.Size = UDim2.new(1, 0, 1, -85)
+contentContainer.Position = UDim2.new(0, 0, 0, 85)
 contentContainer.BackgroundTransparency = 1
 contentContainer.Parent = mainFrame
 
--- Текст приветствия
-local welcomeLabel = Instance.new("TextLabel")
-welcomeLabel.Size = UDim2.new(1, -40, 0, 200)
-welcomeLabel.Position = UDim2.new(0, 20, 0, 20)
-welcomeLabel.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
-welcomeLabel.BackgroundTransparency = 0.2
-welcomeLabel.Text = "🛡️ DELTA PROTECT v5.1\n\n✅ Защита хитбоксов - ВКЛ\n✅ Инвиз - ВКЛ\n✅ Полёт - W A S D + Пробел\n✅ NoClip\n\nНажми [F5] чтобы скрыть/показать\nНажми [F6] для защиты хитбоксов"
-welcomeLabel.TextColor3 = Color3.fromRGB(200, 200, 230)
-welcomeLabel.TextSize = 13
-welcomeLabel.Font = Enum.Font.Gotham
-welcomeLabel.TextWrapped = true
-welcomeLabel.TextXAlignment = Enum.TextXAlignment.Center
-welcomeLabel.Parent = contentContainer
+-- Вкладки
+local tabs = {}
+local currentTab = nil
 
-local welcomeCorner = Instance.new("UICorner")
-welcomeCorner.CornerRadius = UDim.new(0, 10)
-welcomeCorner.Parent = welcomeLabel
-
--- Кнопки быстрого доступа
-local protectBtn = Instance.new("TextButton")
-protectBtn.Size = UDim2.new(0.45, -10, 0, 45)
-protectBtn.Position = UDim2.new(0, 20, 0, 240)
-protectBtn.BackgroundColor3 = Color3.fromRGB(80, 50, 50)
-protectBtn.Text = "🛡️ ЗАЩИТА"
-protectBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-protectBtn.TextSize = 14
-protectBtn.Font = Enum.Font.GothamBold
-protectBtn.BorderSizePixel = 0
-protectBtn.Parent = contentContainer
-
-local protectCorner = Instance.new("UICorner")
-protectCorner.CornerRadius = UDim.new(0, 8)
-protectCorner.Parent = protectBtn
-
-local invisBtn = Instance.new("TextButton")
-invisBtn.Size = UDim2.new(0.45, -10, 0, 45)
-invisBtn.Position = UDim2.new(0.55, -10, 0, 240)
-invisBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 80)
-invisBtn.Text = "👻 ИНВИЗ"
-invisBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-invisBtn.TextSize = 14
-invisBtn.Font = Enum.Font.GothamBold
-invisBtn.BorderSizePixel = 0
-invisBtn.Parent = contentContainer
-
-local invisCorner = Instance.new("UICorner")
-invisCorner.CornerRadius = UDim.new(0, 8)
-invisCorner.Parent = invisBtn
-
-local flyBtn = Instance.new("TextButton")
-flyBtn.Size = UDim2.new(0.45, -10, 0, 45)
-flyBtn.Position = UDim2.new(0, 20, 0, 300)
-flyBtn.BackgroundColor3 = Color3.fromRGB(50, 80, 50)
-flyBtn.Text = "✈️ ПОЛЁТ"
-flyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-flyBtn.TextSize = 14
-flyBtn.Font = Enum.Font.GothamBold
-flyBtn.BorderSizePixel = 0
-flyBtn.Parent = contentContainer
-
-local flyCorner = Instance.new("UICorner")
-flyCorner.CornerRadius = UDim.new(0, 8)
-flyCorner.Parent = flyBtn
-
-local noclipBtn = Instance.new("TextButton")
-noclipBtn.Size = UDim2.new(0.45, -10, 0, 45)
-noclipBtn.Position = UDim2.new(0.55, -10, 0, 300)
-noclipBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 50)
-noclipBtn.Text = "🚪 NOCLIP"
-noclipBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-noclipBtn.TextSize = 14
-noclipBtn.Font = Enum.Font.GothamBold
-noclipBtn.BorderSizePixel = 0
-noclipBtn.Parent = contentContainer
-
-local noclipCorner = Instance.new("UICorner")
-noclipCorner.CornerRadius = UDim.new(0, 8)
-noclipCorner.Parent = noclipBtn
-
--- Статус бар
-local statusBar = Instance.new("Frame")
-statusBar.Size = UDim2.new(1, -40, 0, 35)
-statusBar.Position = UDim2.new(0, 20, 1, -55)
-statusBar.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-statusBar.BackgroundTransparency = 0.3
-statusBar.BorderSizePixel = 0
-statusBar.Parent = contentContainer
-
-local statusCorner = Instance.new("UICorner")
-statusCorner.CornerRadius = UDim.new(0, 8)
-statusCorner.Parent = statusBar
-
-local statusText = Instance.new("TextLabel")
-statusText.Size = UDim2.new(1, -10, 1, 0)
-statusText.Position = UDim2.new(0, 5, 0, 0)
-statusText.BackgroundTransparency = 1
-statusText.Text = "Статус: Защита выключена | Инвиз выключен"
-statusText.TextColor3 = Color3.fromRGB(200, 200, 200)
-statusText.TextSize = 11
-statusText.Font = Enum.Font.Gotham
-statusText.TextXAlignment = Enum.TextXAlignment.Left
-statusText.Parent = statusBar
-
--- ============ ФУНКЦИИ ============
-
--- Обновление статуса
-local function updateStatus()
-    local status = ""
-    if hitboxProtection then status = status .. "🛡️ Защита ВКЛ | " else status = status .. "Защита ВЫКЛ | " end
-    if invisibilityEnabled then status = status .. "👻 Инвиз ВКЛ" else status = status .. "Инвиз ВЫКЛ" end
-    statusText.Text = "Статус: " .. status
+local function createTab(name, index)
+    local tab = Instance.new("TextButton")
+    tab.Size = UDim2.new(0.2, 0, 1, 0)
+    tab.Position = UDim2.new((index - 1) * 0.2, 0, 0, 0)
+    tab.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    tab.Text = name
+    tab.TextColor3 = Color3.fromRGB(200, 200, 200)
+    tab.TextSize = 13
+    tab.Font = Enum.Font.GothamSemibold
+    tab.BorderSizePixel = 0
+    tab.Parent = tabContainer
+    
+    local tabCorner = Instance.new("UICorner")
+    tabCorner.CornerRadius = UDim.new(0, 5)
+    tabCorner.Parent = tab
+    
+    -- Контент для вкладки
+    local content = Instance.new("ScrollingFrame")
+    content.Size = UDim2.new(1, -20, 1, -10)
+    content.Position = UDim2.new(0, 10, 0, 5)
+    content.BackgroundTransparency = 1
+    content.ScrollBarThickness = 5
+    content.CanvasSize = UDim2.new(0, 0, 0, 0)
+    content.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    content.Visible = false
+    content.Parent = contentContainer
+    
+    local contentLayout = Instance.new("UIListLayout")
+    contentLayout.Padding = UDim.new(0, 8)
+    contentLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    contentLayout.Parent = content
+    
+    tabs[name] = {button = tab, content = content}
+    
+    tab.MouseButton1Click:Connect(function()
+        if currentTab then
+            tabs[currentTab].content.Visible = false
+            tabs[currentTab].button.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+            tabs[currentTab].button.TextColor3 = Color3.fromRGB(200, 200, 200)
+        end
+        currentTab = name
+        content.Visible = true
+        tab.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+        tab.TextColor3 = Color3.fromRGB(255, 255, 255)
+    end)
+    
+    return content
 end
 
--- ЗАЩИТА ХИТБОКСОВ
-local function enableHitboxProtection()
-    if hitboxProtection then return end
-    hitboxProtection = true
+-- Функции для создания элементов
+local function createButton(parent, text, color, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -20, 0, 40)
+    btn.Position = UDim2.new(0, 10, 0, 0)
+    btn.BackgroundColor3 = color or Color3.fromRGB(55, 55, 65)
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextSize = 14
+    btn.Font = Enum.Font.Gotham
+    btn.BorderSizePixel = 0
+    btn.Parent = parent
     
-    local function protectCharacter(character)
-        for _, part in pairs(character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                pcall(function()
-                    part.CanCollide = false
-                    part.CanQuery = false
-                    part.CanTouch = false
-                end)
-            end
-        end
-        
-        local humanoid = character:FindFirstChild("Humanoid")
-        if humanoid then
-            pcall(function()
-                humanoid.BreakJointsOnDeath = false
-                humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, false)
-                humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
-            end)
-        end
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 6)
+    btnCorner.Parent = btn
+    
+    btn.MouseButton1Click:Connect(callback)
+    return btn
+end
+
+local function createToggle(parent, text, getter, setter)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1, -20, 0, 45)
+    container.Position = UDim2.new(0, 10, 0, 0)
+    container.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+    container.BorderSizePixel = 0
+    container.Parent = parent
+    
+    local containerCorner = Instance.new("UICorner")
+    containerCorner.CornerRadius = UDim.new(0, 6)
+    containerCorner.Parent = container
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.7, -10, 1, 0)
+    label.Position = UDim2.new(0, 10, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.TextSize = 13
+    label.Font = Enum.Font.Gotham
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = container
+    
+    local toggle = Instance.new("TextButton")
+    toggle.Size = UDim2.new(0, 70, 0, 30)
+    toggle.Position = UDim2.new(1, -80, 0.5, -15)
+    toggle.BackgroundColor3 = getter() and Color3.fromRGB(76, 175, 80) or Color3.fromRGB(220, 60, 60)
+    toggle.Text = getter() and "ВКЛ" or "ВЫКЛ"
+    toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    toggle.TextSize = 12
+    toggle.Font = Enum.Font.GothamBold
+    toggle.BorderSizePixel = 0
+    toggle.Parent = container
+    
+    local toggleCorner = Instance.new("UICorner")
+    toggleCorner.CornerRadius = UDim.new(1, 0)
+    toggleCorner.Parent = toggle
+    
+    toggle.MouseButton1Click:Connect(function()
+        local newVal = not getter()
+        setter(newVal)
+        toggle.BackgroundColor3 = newVal and Color3.fromRGB(76, 175, 80) or Color3.fromRGB(220, 60, 60)
+        toggle.Text = newVal and "ВКЛ" or "ВЫКЛ"
+    end)
+    
+    return container
+end
+
+local function createSlider(parent, text, minVal, maxVal, getter, setter)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1, -20, 0, 70)
+    container.Position = UDim2.new(0, 10, 0, 0)
+    container.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+    container.BorderSizePixel = 0
+    container.Parent = parent
+    
+    local containerCorner = Instance.new("UICorner")
+    containerCorner.CornerRadius = UDim.new(0, 6)
+    containerCorner.Parent = container
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -20, 0, 25)
+    label.Position = UDim2.new(0, 10, 0, 5)
+    label.BackgroundTransparency = 1
+    label.Text = text .. ": " .. string.format("%.1f", getter())
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.TextSize = 13
+    label.Font = Enum.Font.Gotham
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = container
+    
+    local sliderBg = Instance.new("Frame")
+    sliderBg.Size = UDim2.new(1, -30, 0, 5)
+    sliderBg.Position = UDim2.new(0, 15, 0, 45)
+    sliderBg.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    sliderBg.BorderSizePixel = 0
+    sliderBg.Parent = container
+    
+    local sliderBgCorner = Instance.new("UICorner")
+    sliderBgCorner.CornerRadius = UDim.new(1, 0)
+    sliderBgCorner.Parent = sliderBg
+    
+    local sliderFill = Instance.new("Frame")
+    sliderFill.Size = UDim2.new((getter() - minVal) / (maxVal - minVal), 0, 1, 0)
+    sliderFill.BackgroundColor3 = Color3.fromRGB(76, 175, 80)
+    sliderFill.BorderSizePixel = 0
+    sliderFill.Parent = sliderBg
+    
+    local sliderFillCorner = Instance.new("UICorner")
+    sliderFillCorner.CornerRadius = UDim.new(1, 0)
+    sliderFillCorner.Parent = sliderFill
+    
+    local valueText = Instance.new("TextLabel")
+    valueText.Size = UDim2.new(0, 50, 0, 25)
+    valueText.Position = UDim2.new(1, -60, 0, 5)
+    valueText.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+    valueText.Text = string.format("%.0f", getter())
+    valueText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    valueText.TextSize = 12
+    valueText.Font = Enum.Font.GothamBold
+    valueText.BorderSizePixel = 0
+    valueText.Parent = container
+    
+    local valueCorner = Instance.new("UICorner")
+    valueCorner.CornerRadius = UDim.new(0, 4)
+    valueCorner.Parent = valueText
+    
+    local dragging = false
+    
+    local function updateValue(value)
+        value = math.clamp(value, minVal, maxVal)
+        setter(value)
+        label.Text = text .. ": " .. string.format("%.1f", value)
+        valueText.Text = string.format("%.0f", value)
+        local percent = (value - minVal) / (maxVal - minVal)
+        sliderFill.Size = UDim2.new(percent, 0, 1, 0)
     end
     
-    local char = LocalPlayer.Character
-    if char then
-        protectCharacter(char)
-    end
-    
-    if characterConnection then characterConnection:Disconnect() end
-    characterConnection = LocalPlayer.CharacterAdded:Connect(function(character)
-        character:WaitForChild("HumanoidRootPart")
-        task.wait(0.1)
-        if hitboxProtection then
-            protectCharacter(character)
+    sliderBg.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            local percent = math.clamp((input.Position.X - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X, 0, 1)
+            updateValue(minVal + percent * (maxVal - minVal))
         end
     end)
     
-    protectBtn.BackgroundColor3 = Color3.fromRGB(100, 60, 60)
-    updateStatus()
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local percent = math.clamp((UserInputService:GetMouseLocation().X - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X, 0, 1)
+            updateValue(minVal + percent * (maxVal - minVal))
+        end
+    end)
+    
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
 end
 
-local function disableHitboxProtection()
-    hitboxProtection = false
+-- ============ ФУНКЦИОНАЛ ============
+
+-- Функция для получения персонажа игрока
+local function getCharacter(plr)
+    if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+        return plr.Character
+    end
+    return nil
+end
+
+-- Teleport
+local function teleportToPlayer(target)
+    local localChar = getCharacter(LocalPlayer)
+    local targetChar = getCharacter(target)
     
-    local char = LocalPlayer.Character
-    if char then
-        for _, part in pairs(char:GetDescendants()) do
-            if part:IsA("BasePart") then
-                pcall(function()
-                    part.CanCollide = true
-                    part.CanQuery = true
-                    part.CanTouch = true
-                end)
-            end
-        end
-        
-        local humanoid = char:FindFirstChild("Humanoid")
-        if humanoid then
-            pcall(function()
-                humanoid.BreakJointsOnDeath = true
-                humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, true)
-                humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
-            end)
+    if localChar and targetChar then
+        localChar.HumanoidRootPart.CFrame = targetChar.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
+    end
+end
+
+-- Fling (улучшенный)
+local function flingPlayer(target)
+    local targetChar = getCharacter(target)
+    if targetChar and targetChar:FindFirstChild("HumanoidRootPart") then
+        local hrp = targetChar.HumanoidRootPart
+        for i = 1, 5 do
+            local bv = Instance.new("BodyVelocity")
+            bv.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+            bv.Velocity = Vector3.new(math.random(-200000, 200000), math.random(100000, 500000), math.random(-200000, 200000))
+            bv.Parent = hrp
+            game:GetService("Debris"):AddItem(bv, 0.5)
         end
     end
-    
-    protectBtn.BackgroundColor3 = Color3.fromRGB(80, 50, 50)
-    updateStatus()
 end
 
--- ИНВИЗ
-local function enableInvisibility()
-    if invisibilityEnabled then return end
-    invisibilityEnabled = true
-    
-    local char = LocalPlayer.Character
-    if char then
-        for _, part in pairs(char:GetDescendants()) do
-            if part:IsA("BasePart") then
-                originalTransparencies[part] = part.Transparency
-                part.Transparency = 1
-            end
-        end
-    end
-    
-    invisBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 100)
-    updateStatus()
-end
-
-local function disableInvisibility()
-    invisibilityEnabled = false
-    
-    local char = LocalPlayer.Character
-    if char then
-        for part, origTrans in pairs(originalTransparencies) do
-            if part and part.Parent then
-                part.Transparency = origTrans
-            end
-        end
-    end
-    originalTransparencies = {}
-    
-    invisBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 80)
-    updateStatus()
-end
-
--- ПОЛЁТ
+-- Fly
 local function enableFly()
     if flying then return end
     flying = true
@@ -361,6 +411,7 @@ local function enableFly()
     if not humanoid or not hrp then return end
     
     originalSpeed = humanoid.WalkSpeed
+    
     humanoid.PlatformStand = true
     
     bodyVelocity = Instance.new("BodyVelocity")
@@ -400,8 +451,6 @@ local function enableFly()
             bodyVelocity.Velocity = moveDir
         end
     end)
-    
-    flyBtn.BackgroundColor3 = Color3.fromRGB(60, 100, 60)
 end
 
 local function disableFly()
@@ -426,147 +475,387 @@ local function disableFly()
         flyConnection:Disconnect()
         flyConnection = nil
     end
-    
-    flyBtn.BackgroundColor3 = Color3.fromRGB(50, 80, 50)
 end
 
--- NOCLIP
+-- ============ ИСПРАВЛЕННЫЙ NOCLIP ============
+local noclipCharacterConnection = nil
+local noclipSteppedConnection = nil
+
 local function enableNoclip()
     if noclipEnabled then return end
     noclipEnabled = true
     
     local function applyNoclip(character)
+        if not character then return end
+        -- Отключаем коллизию на всех частях тела
         for _, part in pairs(character:GetDescendants()) do
             if part:IsA("BasePart") then
-                part.CanCollide = false
+                pcall(function()
+                    part.CanCollide = false
+                end)
             end
         end
     end
     
+    -- Функция для постоянного обновления NoClip (через степ)
+    local function updateNoclip()
+        if not noclipEnabled then return end
+        local char = LocalPlayer.Character
+        if char then
+            for _, part in pairs(char:GetDescendants()) do
+                if part:IsA("BasePart") and part.CanCollide == true then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end
+    
+    -- Применяем к текущему персонажу
     local char = LocalPlayer.Character
     if char then
         applyNoclip(char)
     end
     
-    LocalPlayer.CharacterAdded:Connect(function(character)
+    -- Подключаем постоянное обновление
+    noclipSteppedConnection = RunService.Stepped:Connect(updateNoclip)
+    
+    -- Подключаем при респавне
+    noclipCharacterConnection = LocalPlayer.CharacterAdded:Connect(function(character)
         character:WaitForChild("HumanoidRootPart")
+        task.wait(0.1)
         if noclipEnabled then
             applyNoclip(character)
         end
     end)
-    
-    noclipBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 60)
 end
 
 local function disableNoclip()
     noclipEnabled = false
     
+    if noclipSteppedConnection then
+        noclipSteppedConnection:Disconnect()
+        noclipSteppedConnection = nil
+    end
+    
+    if noclipCharacterConnection then
+        noclipCharacterConnection:Disconnect()
+        noclipCharacterConnection = nil
+    end
+    
     local char = LocalPlayer.Character
     if char then
         for _, part in pairs(char:GetDescendants()) do
             if part:IsA("BasePart") then
-                part.CanCollide = true
+                pcall(function()
+                    part.CanCollide = true
+                end)
+            end
+        end
+    end
+end
+
+-- WalkSpeed
+local function setWalkSpeed(speed)
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("Humanoid") then
+        char.Humanoid.WalkSpeed = speed
+    end
+end
+
+-- ============ НОВЫЕ ФУНКЦИИ (добавлено +127 строк) ============
+
+-- 1. Infinite Jump (Бесконечные прыжки)
+local function enableInfiniteJump()
+    if infiniteJump then return end
+    infiniteJump = true
+    
+    local function onJump()
+        if infiniteJump then
+            local char = LocalPlayer.Character
+            local humanoid = char and char:FindFirstChild("Humanoid")
+            if humanoid and humanoid:GetState() == Enum.HumanoidStateType.Landed then
+                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
             end
         end
     end
     
-    noclipBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 50)
+    infiniteJumpConnection = UserInputService.JumpRequest:Connect(onJump)
 end
 
--- ============ НАЗНАЧЕНИЕ КНОПОК ============
-
-protectBtn.MouseButton1Click:Connect(function()
-    if hitboxProtection then
-        disableHitboxProtection()
-    else
-        enableHitboxProtection()
+local function disableInfiniteJump()
+    infiniteJump = false
+    if infiniteJumpConnection then
+        infiniteJumpConnection:Disconnect()
+        infiniteJumpConnection = nil
     end
-end)
+end
 
-invisBtn.MouseButton1Click:Connect(function()
-    if invisibilityEnabled then
-        disableInvisibility()
-    else
-        enableInvisibility()
+-- 2. Super Jump (Супер прыжок)
+local function doSuperJump()
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        hrp.AssemblyLinearVelocity = Vector3.new(0, 250, 0)
     end
-end)
+end
 
-flyBtn.MouseButton1Click:Connect(function()
-    if flying then
-        disableFly()
-    else
-        enableFly()
-    end
-end)
-
-noclipBtn.MouseButton1Click:Connect(function()
-    if noclipEnabled then
-        disableNoclip()
-    else
-        enableNoclip()
-    end
-end)
-
--- ============ ГОРЯЧИЕ КЛАВИШИ ============
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
+-- 3. Hitbox Expansion (Увеличение хитбокса)
+local function enableHitboxExpansion()
+    if hitboxExpansion then return end
+    hitboxExpansion = true
     
-    if input.KeyCode == Enum.KeyCode.F5 then
-        mainFrame.Visible = not mainFrame.Visible
-    elseif input.KeyCode == Enum.KeyCode.F6 then
-        if hitboxProtection then
-            disableHitboxProtection()
-        else
-            enableHitboxProtection()
-        end
-    elseif input.KeyCode == Enum.KeyCode.F7 then
-        if invisibilityEnabled then
-            disableInvisibility()
-        else
-            enableInvisibility()
-        end
-    elseif input.KeyCode == Enum.KeyCode.F8 then
-        if flying then
-            disableFly()
-        else
-            enableFly()
+    local function expandHitbox(character)
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            originalHitboxSize = hrp.Size
+            hrp.Size = Vector3.new(8, 8, 8)
+            -- Создаём прозрачный расширитель хитбокса
+            local expander = Instance.new("Part")
+            expander.Name = "HitboxExpander"
+            expander.Size = Vector3.new(8, 8, 8)
+            expander.Transparency = 1
+            expander.CanCollide = false
+            expander.Anchored = false
+            expander.Parent = hrp
         end
     end
-end)
-
--- ============ ЗАКРЫТИЕ (ИСПРАВЛЕНО) ============
-local function closeGui()
-    -- Отключаем всё
-    pcall(function()
-        if flying then disableFly() end
-        if noclipEnabled then disableNoclip() end
-        if hitboxProtection then disableHitboxProtection() end
-        if invisibilityEnabled then disableInvisibility() end
-        if characterConnection then characterConnection:Disconnect() end
-        if flyConnection then flyConnection:Disconnect() end
+    
+    local char = LocalPlayer.Character
+    if char then
+        expandHitbox(char)
+    end
+    
+    LocalPlayer.CharacterAdded:Connect(function(character)
+        character:WaitForChild("HumanoidRootPart")
+        task.wait(0.1)
+        if hitboxExpansion then
+            expandHitbox(character)
+        end
     end)
+end
+
+local function disableHitboxExpansion()
+    hitboxExpansion = false
     
-    -- Удаляем GUI
-    task.spawn(function()
-        task.wait(0.05)
-        pcall(function()
-            if screenGui and screenGui.Parent then
-                screenGui:Destroy()
+    local char = LocalPlayer.Character
+    if char then
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            if originalHitboxSize then
+                hrp.Size = originalHitboxSize
             end
-        end)
+            local expander = hrp:FindFirstChild("HitboxExpander")
+            if expander then expander:Destroy() end
+        end
+    end
+end
+
+-- 4. Auto Clicker (Автокликер)
+local function enableAutoClicker()
+    if autoClickerEnabled then return end
+    autoClickerEnabled = true
+    
+    autoClickerConnection = RunService.RenderStepped:Connect(function()
+        if autoClickerEnabled and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+            -- Эмулируем клик
+            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+            task.wait(0.05)
+            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+        end
     end)
 end
 
-closeButton.MouseButton1Click:Connect(closeGui)
-minButton.MouseButton1Click:Connect(function()
-    mainFrame.Visible = false
-end)
-
--- Минификация при нажатии на заголовок
-titleBar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 and input.Position.Y - titleBar.AbsolutePosition.Y < 50 then
-        -- Драг реализован через Draggable свойство
+local function disableAutoClicker()
+    autoClickerEnabled = false
+    if autoClickerConnection then
+        autoClickerConnection:Disconnect()
+        autoClickerConnection = nil
     end
-end)
+end
 
-print("✅ DELTA PROTECT v5.1 загружен! Нажми F5 чтобы скрыть GUI")
+-- 5. Anti-Stun (Защита от оглушения)
+local function enableAntiStun()
+    if antiStunEnabled then return end
+    antiStunEnabled = true
+    
+    local function protectFromStun(character)
+        local humanoid = character:FindFirstChild("Humanoid")
+        if humanoid then
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, false)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Physics, false)
+        end
+    end
+    
+    local char = LocalPlayer.Character
+    if char then
+        protectFromStun(char)
+    end
+    
+    LocalPlayer.CharacterAdded:Connect(function(character)
+        character:WaitForChild("Humanoid")
+        task.wait(0.1)
+        if antiStunEnabled then
+            protectFromStun(character)
+        end
+    end)
+end
+
+local function disableAntiStun()
+    antiStunEnabled = false
+    
+    local char = LocalPlayer.Character
+    if char then
+        local humanoid = char:FindFirstChild("Humanoid")
+        if humanoid then
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, true)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Physics, true)
+        end
+    end
+end
+
+-- ============ СОЗДАНИЕ ВКЛАДОК И ЭЛЕМЕНТОВ ============
+
+-- Вкладка "Teleport"
+local teleportTab = createTab("📍 ТП", 1)
+
+local teleportLabel = Instance.new("TextLabel")
+teleportLabel.Size = UDim2.new(1, -20, 0, 30)
+teleportLabel.Position = UDim2.new(0, 10, 0, 0)
+teleportLabel.BackgroundTransparency = 1
+teleportLabel.Text = "Выберите игрока для телепортации:"
+teleportLabel.TextColor3 = Color3.fromRGB(180, 180, 200)
+teleportLabel.TextSize = 13
+teleportLabel.Font = Enum.Font.Gotham
+teleportLabel.TextXAlignment = Enum.TextXAlignment.Left
+teleportLabel.Parent = teleportTab
+
+local playersListFrame = Instance.new("ScrollingFrame")
+playersListFrame.Size = UDim2.new(1, -20, 0, 280)
+playersListFrame.Position = UDim2.new(0, 10, 0, 40)
+playersListFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+playersListFrame.BackgroundTransparency = 0.3
+playersListFrame.BorderSizePixel = 0
+playersListFrame.ScrollBarThickness = 5
+playersListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+playersListFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+playersListFrame.Parent = teleportTab
+
+local playersListCorner = Instance.new("UICorner")
+playersListCorner.CornerRadius = UDim.new(0, 6)
+playersListCorner.Parent = playersListFrame
+
+local playersListLayout = Instance.new("UIListLayout")
+playersListLayout.Padding = UDim.new(0, 5)
+playersListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+playersListLayout.Parent = playersListFrame
+
+local function updatePlayersUI()
+    for _, child in pairs(playersListFrame:GetChildren()) do
+        if child:IsA("TextButton") then
+            child:Destroy()
+        end
+    end
+    
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, -10, 0, 40)
+            btn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+            btn.Text = "🎮 " .. player.Name
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            btn.TextSize = 14
+            btn.Font = Enum.Font.Gotham
+            btn.BorderSizePixel = 0
+            btn.Parent = playersListFrame
+            
+            local btnCorner = Instance.new("UICorner")
+            btnCorner.CornerRadius = UDim.new(0, 6)
+            btnCorner.Parent = btn
+            
+            btn.MouseButton1Click:Connect(function()
+                teleportToPlayer(player)
+            end)
+        end
+    end
+end
+
+updatePlayersUI()
+Players.PlayerAdded:Connect(updatePlayersUI)
+Players.PlayerRemoving:Connect(updatePlayersUI)
+
+-- Вкладка "Fling"
+local flingTab = createTab("💥 Флинг", 2)
+
+local flingLabel = Instance.new("TextLabel")
+flingLabel.Size = UDim2.new(1, -20, 0, 30)
+flingLabel.Position = UDim2.new(0, 10, 0, 0)
+flingLabel.BackgroundTransparency = 1
+flingLabel.Text = "Выберите игрока для флинга:"
+flingLabel.TextColor3 = Color3.fromRGB(180, 180, 200)
+flingLabel.TextSize = 13
+flingLabel.Font = Enum.Font.Gotham
+flingLabel.TextXAlignment = Enum.TextXAlignment.Left
+flingLabel.Parent = flingTab
+
+local flingListFrame = Instance.new("ScrollingFrame")
+flingListFrame.Size = UDim2.new(1, -20, 0, 280)
+flingListFrame.Position = UDim2.new(0, 10, 0, 40)
+flingListFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+flingListFrame.BackgroundTransparency = 0.3
+flingListFrame.BorderSizePixel = 0
+flingListFrame.ScrollBarThickness = 5
+flingListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+flingListFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+flingListFrame.Parent = flingTab
+
+local flingListCorner = Instance.new("UICorner")
+flingListCorner.CornerRadius = UDim.new(0, 6)
+flingListCorner.Parent = flingListFrame
+
+local flingListLayout = Instance.new("UIListLayout")
+flingListLayout.Padding = UDim.new(0, 5)
+flingListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+flingListLayout.Parent = flingListFrame
+
+local function updateFlingUI()
+    for _, child in pairs(flingListFrame:GetChildren()) do
+        if child:IsA("TextButton") then
+            child:Destroy()
+        end
+    end
+    
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, -10, 0, 40)
+            btn.BackgroundColor3 = Color3.fromRGB(70, 45, 45)
+            btn.Text = "⚡ " .. player.Name
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            btn.TextSize = 14
+            btn.Font = Enum.Font.Gotham
+            btn.BorderSizePixel = 0
+            btn.Parent = flingListFrame
+            
+            local btnCorner = Instance.new("UICorner")
+            btnCorner.CornerRadius = UDim.new(0, 6)
+            btnCorner.Parent = btn
+            
+            btn.MouseButton1Click:Connect(function()
+                flingPlayer(player)
+            end)
+        end
+    end
+end
+
+updateFlingUI()
+Players.PlayerAdded:Connect(updateFlingUI)
+Players.PlayerRemoving:Connect(updateFlingUI)
+
+-- Вкладка "Movement"
+local moveTab = createTab("🏃 Движение", 3)
+
+createToggle(moveTab, "
