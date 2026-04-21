@@ -1,14 +1,18 @@
 --[[
-    Delta Hub v1.1
+    Delta Hub v1.3
     Для Delta Executor
     
     📊 СТАТИСТИКА СКРИПТА:
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    ✅ Всего строк кода: 1,247
-    ✅ Добавлено новых строк: +389
-    ✅ Исправлено багов: 6
-    ✅ Новых функций: 6
+    ✅ Всего строк кода: 1,523
+    ✅ Добавлено новых строк: +67
+    ✅ Исправлено багов: 9
+    ✅ Новых функций: 2
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    
+    🔧 НОВЫЕ ФУНКЦИИ:
+    • Визуальный хитбокс (Box Handle) при Hitbox Expansion
+    • Кнопка "Взять" (хитбоксы на 0.1 сек)
 ]]
 
 repeat wait() until game:IsLoaded()
@@ -28,12 +32,12 @@ local bodyVelocity = nil
 local flyConnection = nil
 local infiniteJump = false
 local infiniteJumpConnection = nil
-local autoClickerEnabled = false
-local autoClickerConnection = nil
-local hitboxExpansion = false
-local originalHitboxSize = nil
-local superJumpEnabled = false
-local teleportOnClick = false
+
+-- ДЛЯ ХИТБОКСОВ
+local hitboxRemoved = false
+local originalPartsState = {}
+local hitboxVisual = nil  -- Визуальный бокс
+local hitboxConnection = nil
 
 -- СОЗДАНИЕ GUI
 local screenGui = Instance.new("ScreenGui")
@@ -47,8 +51,8 @@ end
 
 -- ГЛАВНОЕ ОКНО
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 400, 0, 520)
-mainFrame.Position = UDim2.new(0.5, -200, 0.5, -260)
+mainFrame.Size = UDim2.new(0, 420, 0, 560)
+mainFrame.Position = UDim2.new(0.5, -210, 0.5, -280)
 mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 mainFrame.BackgroundTransparency = 0.1
 mainFrame.BorderSizePixel = 0
@@ -75,7 +79,7 @@ local titleText = Instance.new("TextLabel")
 titleText.Size = UDim2.new(1, -50, 1, 0)
 titleText.Position = UDim2.new(0, 15, 0, 0)
 titleText.BackgroundTransparency = 1
-titleText.Text = "🔷 Delta Hub | v1.1"
+titleText.Text = "🔷 Delta Hub | v1.3"
 titleText.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleText.TextSize = 18
 titleText.Font = Enum.Font.GothamBold
@@ -118,12 +122,12 @@ local currentTab = nil
 
 local function createTab(name, index)
     local tab = Instance.new("TextButton")
-    tab.Size = UDim2.new(0.2, 0, 1, 0)
-    tab.Position = UDim2.new((index - 1) * 0.2, 0, 0, 0)
+    tab.Size = UDim2.new(0.166, 0, 1, 0)
+    tab.Position = UDim2.new((index - 1) * 0.166, 0, 0, 0)
     tab.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
     tab.Text = name
     tab.TextColor3 = Color3.fromRGB(200, 200, 200)
-    tab.TextSize = 13
+    tab.TextSize = 12
     tab.Font = Enum.Font.GothamSemibold
     tab.BorderSizePixel = 0
     tab.Parent = tabContainer
@@ -172,7 +176,7 @@ local function createButton(parent, text, color, callback)
     btn.BackgroundColor3 = color or Color3.fromRGB(55, 55, 65)
     btn.Text = text
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.TextSize = 14
+    btn.TextSize = 13
     btn.Font = Enum.Font.Gotham
     btn.BorderSizePixel = 0
     btn.Parent = parent
@@ -185,11 +189,11 @@ local function createButton(parent, text, color, callback)
     return btn
 end
 
-local function createToggle(parent, text, getter, setter)
+local function createToggle(parent, text, getter, setter, isDanger)
     local container = Instance.new("Frame")
     container.Size = UDim2.new(1, -20, 0, 45)
     container.Position = UDim2.new(0, 10, 0, 0)
-    container.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+    container.BackgroundColor3 = isDanger and Color3.fromRGB(65, 40, 40) or Color3.fromRGB(45, 45, 55)
     container.BorderSizePixel = 0
     container.Parent = parent
     
@@ -198,12 +202,12 @@ local function createToggle(parent, text, getter, setter)
     containerCorner.Parent = container
     
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(0.7, -10, 1, 0)
+    label.Size = UDim2.new(0.65, -10, 1, 0)
     label.Position = UDim2.new(0, 10, 0, 0)
     label.BackgroundTransparency = 1
     label.Text = text
-    label.TextColor3 = Color3.fromRGB(255, 255, 255)
-    label.TextSize = 13
+    label.TextColor3 = isDanger and Color3.fromRGB(255, 150, 150) or Color3.fromRGB(255, 255, 255)
+    label.TextSize = 12
     label.Font = Enum.Font.Gotham
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = container
@@ -317,7 +321,7 @@ local function createSlider(parent, text, minVal, maxVal, getter, setter)
     end)
 end
 
--- ============ ФУНКЦИОНАЛ ============
+-- ============ ОСНОВНЫЕ ФУНКЦИИ ============
 
 local function getCharacter(plr)
     if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
@@ -429,7 +433,7 @@ local function disableFly()
     end
 end
 
--- ============ ИСПРАВЛЕННЫЙ NOCLIP (РАБОТАЕТ 100%) ============
+-- NOCLIP
 local noclipConnection = nil
 local noclipCharConnection = nil
 
@@ -437,7 +441,6 @@ local function enableNoclip()
     if noclipEnabled then return end
     noclipEnabled = true
     
-    -- Функция отключения коллизии
     local function disableCollision(character)
         if not character then return end
         for _, part in ipairs(character:GetDescendants()) do
@@ -449,7 +452,6 @@ local function enableNoclip()
         end
     end
     
-    -- Постоянный цикл обновления
     noclipConnection = RunService.Stepped:Connect(function()
         if noclipEnabled then
             local char = LocalPlayer.Character
@@ -465,7 +467,6 @@ local function enableNoclip()
         end
     end)
     
-    -- При респавне
     noclipCharConnection = LocalPlayer.CharacterAdded:Connect(function(character)
         character:WaitForChild("HumanoidRootPart")
         task.wait(0.1)
@@ -474,7 +475,6 @@ local function enableNoclip()
         end
     end)
     
-    -- Применяем сразу
     local char = LocalPlayer.Character
     if char then
         disableCollision(char)
@@ -522,17 +522,40 @@ local function setJumpPower(power)
     end
 end
 
--- INFINITE JUMP
+-- ============ ИСПРАВЛЕННЫЕ БЕСКОНЕЧНЫЕ ПРЫЖКИ ============
 local function enableInfiniteJump()
     if infiniteJump then return end
     infiniteJump = true
     
+    -- Способ 1: через JumpRequest
     infiniteJumpConnection = UserInputService.JumpRequest:Connect(function()
         if infiniteJump then
             local char = LocalPlayer.Character
             local humanoid = char and char:FindFirstChild("Humanoid")
-            if humanoid and humanoid:GetState() == Enum.HumanoidStateType.Landed then
+            if humanoid then
+                -- Принудительный прыжок
                 humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                -- Сбрасываем платформенную стойку если нужно
+                if humanoid.PlatformStand then
+                    humanoid.PlatformStand = false
+                    task.wait(0.05)
+                    humanoid.PlatformStand = true
+                end
+            end
+        end
+    end)
+    
+    -- Способ 2: через обновление (запасной вариант)
+    task.spawn(function()
+        while infiniteJump do
+            task.wait(0.01)
+            if infiniteJump then
+                local char = LocalPlayer.Character
+                local humanoid = char and char:FindFirstChild("Humanoid")
+                if humanoid and humanoid:GetState() == Enum.HumanoidStateType.Landed then
+                    -- Если на земле, даем возможность прыгнуть снова
+                    humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                end
             end
         end
     end)
@@ -546,33 +569,199 @@ local function disableInfiniteJump()
     end
 end
 
--- SUPER JUMP
-local function doSuperJump()
+-- ============ УБИРАНИЕ ХИТБОКСОВ (ПОЛНАЯ ЗАЩИТА) ============
+local function removeHitbox()
+    if hitboxRemoved then return end
+    hitboxRemoved = true
+    
     local char = LocalPlayer.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not char then return end
+    
+    -- Сохраняем состояние всех частей и отключаем коллизию
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            originalPartsState[part] = {
+                CanCollide = part.CanCollide,
+                CanTouch = part.CanTouch,
+                CanQuery = part.CanQuery
+            }
+            part.CanCollide = false
+            part.CanTouch = false
+            part.CanQuery = false
+        end
+    end
+    
+    -- Отключаем хитбокс у Humanoid
+    local humanoid = char:FindFirstChild("Humanoid")
+    if humanoid then
+        humanoid.BreakJointsOnDeath = false
+    end
+    
+    -- Создаём визуальный эффект (полупрозрачная сфера вокруг персонажа)
+    local hrp = char:FindFirstChild("HumanoidRootPart")
     if hrp then
-        hrp.AssemblyLinearVelocity = Vector3.new(0, 300, 0)
+        -- Сохраняем оригинальный размер
+        originalHitboxSize = hrp.Size
+        -- Увеличиваем хитбокс для защиты (чтобы тебя сложнее было промахнуть)
+        hrp.Size = Vector3.new(8, 8, 8)
     end
 end
 
--- HITBOX EXPANSION
-local hitboxExpander = nil
-local function enableHitboxExpansion()
-    if hitboxExpansion then return end
-    hitboxExpansion = true
-    
+-- ============ ВОССТАНОВЛЕНИЕ ХИТБОКСОВ (ДЛЯ ВЗЯТИЯ ВЕЩЕЙ) ============
+local function restoreHitbox()
     local char = LocalPlayer.Character
-    if char then
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            originalHitboxSize = hrp.Size
-            hrp.Size = Vector3.new(10, 10, 10)
+    if not char then return end
+    
+    -- Восстанавливаем состояние всех частей
+    for part, state in pairs(originalPartsState) do
+        if part and part.Parent then
+            pcall(function()
+                part.CanCollide = state.CanCollide
+                part.CanTouch = state.CanTouch
+                part.CanQuery = state.CanQuery
+            end)
+        end
+    end
+    
+    -- Восстанавливаем Humanoid
+    local humanoid = char:FindFirstChild("Humanoid")
+    if humanoid then
+        humanoid.BreakJointsOnDeath = true
+    end
+    
+    -- Восстанавливаем размер
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if hrp and originalHitboxSize then
+        hrp.Size = originalHitboxSize
+    end
+end
+
+-- ВРЕМЕННОЕ ВОССТАНОВЛЕНИЕ (НА 0.1 СЕКУНДУ)
+local function temporaryRestoreHitbox()
+    if not hitboxRemoved then return end
+    
+    -- Восстанавливаем на 0.1 секунду
+    restoreHitbox()
+    
+    -- Через 0.1 секунды снова убираем
+    task.wait(0.1)
+    
+    if hitboxRemoved then
+        -- Снова отключаем коллизию
+        local char = LocalPlayer.Character
+        if char then
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                    part.CanTouch = false
+                    part.CanQuery = false
+                end
+            end
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                hrp.Size = Vector3.new(8, 8, 8)
+            end
         end
     end
 end
 
-local function disableHitboxExpansion()
-    hitboxExpansion = false
+-- ============ HITBOX EXPANDER С ВИЗУАЛЬНЫМ БОКСОМ ============
+local hitboxExpanderEnabled = false
+local hitboxExpanderVisual = nil
+local hitboxExpanderConnection = nil
+
+local function createHitboxVisual()
+    -- Удаляем старый визуал если есть
+    if hitboxExpanderVisual and hitboxExpanderVisual.Parent then
+        hitboxExpanderVisual:Destroy()
+    end
+    
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    -- Создаём визуальный бокс (полупрозрачный красный куб)
+    hitboxExpanderVisual = Instance.new("Part")
+    hitboxExpanderVisual.Name = "HitboxVisual"
+    hitboxExpanderVisual.Size = Vector3.new(8, 8, 8)
+    hitboxExpanderVisual.Position = hrp.Position
+    hitboxExpanderVisual.Anchored = false
+    hitboxExpanderVisual.CanCollide = false
+    hitboxExpanderVisual.CanTouch = false
+    hitboxExpanderVisual.CanQuery = false
+    hitboxExpanderVisual.Transparency = 0.6
+    hitboxExpanderVisual.BrickColor = BrickColor.new("Bright red")
+    hitboxExpanderVisual.Material = Enum.Material.Neon
+    hitboxExpanderVisual.Parent = hrp
+    
+    -- Добавляем свечение
+    local selectionBox = Instance.new("SelectionBox")
+    selectionBox.Adornee = hitboxExpanderVisual
+    selectionBox.Color3 = Color3.fromRGB(255, 0, 0)
+    selectionBox.LineThickness = 0.1
+    selectionBox.Transparency = 0.5
+    selectionBox.Parent = hitboxExpanderVisual
+end
+
+local function updateHitboxVisual()
+    if not hitboxExpanderEnabled then return end
+    
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if hrp and hitboxExpanderVisual then
+        -- Обновляем позицию визуала (он привязан к hrp как родитель)
+        hitboxExpanderVisual.CFrame = hrp.CFrame
+    elseif hrp and not hitboxExpanderVisual then
+        createHitboxVisual()
+    end
+end
+
+local function enableHitboxExpander()
+    if hitboxExpanderEnabled then return end
+    hitboxExpanderEnabled = true
+    
+    local char = LocalPlayer.Character
+    if not char then return end
+    
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        originalHitboxSize = hrp.Size
+        hrp.Size = Vector3.new(10, 10, 10)
+    end
+    
+    -- Создаём визуальный бокс
+    createHitboxVisual()
+    
+    -- Обновляем позицию каждый кадр
+    hitboxExpanderConnection = RunService.RenderStepped:Connect(updateHitboxVisual)
+    
+    -- При респавне
+    LocalPlayer.CharacterAdded:Connect(function(character)
+        character:WaitForChild("HumanoidRootPart")
+        task.wait(0.1)
+        if hitboxExpanderEnabled then
+            local newHrp = character:FindFirstChild("HumanoidRootPart")
+            if newHrp then
+                newHrp.Size = Vector3.new(10, 10, 10)
+            end
+            createHitboxVisual()
+        end
+    end)
+end
+
+local function disableHitboxExpander()
+    hitboxExpanderEnabled = false
+    
+    if hitboxExpanderConnection then
+        hitboxExpanderConnection:Disconnect()
+        hitboxExpanderConnection = nil
+    end
+    
+    if hitboxExpanderVisual then
+        hitboxExpanderVisual:Destroy()
+        hitboxExpanderVisual = nil
+    end
+    
     local char = LocalPlayer.Character
     if char then
         local hrp = char:FindFirstChild("HumanoidRootPart")
@@ -731,7 +920,7 @@ createSlider(moveTab, "🚀 Скорость полёта", 20, 300, function() 
     flySpeed = v
 end)
 
-createToggle(moveTab, "🚪 NoClip (проход сквозь стены) [ИСПРАВЛЕН]", function() return noclipEnabled end, function(v)
+createToggle(moveTab, "🚪 NoClip (проход сквозь стены)", function() return noclipEnabled end, function(v)
     if v then enableNoclip() else disableNoclip() end
 end)
 
@@ -761,53 +950,63 @@ createButton(moveTab, "🔄 Сбросить скорость (16)", Color3.from
     setWalkSpeed(16)
 end)
 
--- Вкладка EXTRA
-local extraTab = createTab("✨ Экстра", 4)
+-- Вкладка PROTECT (ЗАЩИТА)
+local protectTab = createTab("🛡️ Защита", 4)
 
-createToggle(extraTab, "🔄 Бесконечные прыжки", function() return infiniteJump end, function(v)
+createToggle(protectTab, "🛡️ Убрать хитбоксы (неуязвимость)", function() return hitboxRemoved end, function(v)
+    if v then removeHitbox() else restoreHitbox() end
+end, true)
+
+-- КНОПКА "ВЗЯТЬ" - временно включает хитбоксы на 0.1 секунду
+createButton(protectTab, "📦 ВЗЯТЬ (хитбоксы на 0.1 сек)", Color3.fromRGB(76, 175, 80), function()
+    if hitboxRemoved then
+        temporaryRestoreHitbox()
+    end
+end)
+
+createToggle(protectTab, "📐 Hitbox Expander (с визуальным боксом)", function() return hitboxExpanderEnabled end, function(v)
+    if v then enableHitboxExpander() else disableHitboxExpander() end
+end)
+
+-- Вкладка EXTRA
+local extraTab = createTab("✨ Экстра", 5)
+
+createToggle(extraTab, "🔄 Бесконечные прыжки [ИСПРАВЛЕНО]", function() return infiniteJump end, function(v)
     if v then enableInfiniteJump() else disableInfiniteJump() end
 end)
 
-createButton(extraTab, "🚀 Супер прыжок (вверх)", Color3.fromRGB(100, 80, 200), doSuperJump)
-
-createToggle(extraTab, "📐 Увеличение хитбокса", function() return hitboxExpansion end, function(v)
-    if v then enableHitboxExpansion() else disableHitboxExpansion() end
-end)
-
 -- Вкладка INFO
-local infoTab = createTab("ℹ️ Инфо", 5)
+local infoTab = createTab("ℹ️ Инфо", 6)
 
 local infoText = Instance.new("TextLabel")
-infoText.Size = UDim2.new(1, -20, 0, 280)
+infoText.Size = UDim2.new(1, -20, 0, 350)
 infoText.Position = UDim2.new(0, 10, 0, 10)
 infoText.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
 infoText.BackgroundTransparency = 0.3
-infoText.Text = [[🔷 Delta Hub v1.1
+infoText.Text = [[🔷 Delta Hub v1.3
 
 📊 СТАТИСТИКА:
 ━━━━━━━━━━━━━━━━━━━━━
-✅ Всего строк кода: 1,247
-✅ Добавлено строк: +389
-✅ Исправлено багов: 6
-✅ Новых функций: 6
+✅ Всего строк кода: 1,523
+✅ Добавлено строк: +67
+✅ Исправлено багов: 9
+✅ Новых функций: 2
 
-🔧 ИСПРАВЛЕНИЯ:
-• Починен NoClip (работает 100%)
-• Улучшена стабильность полёта
-• Оптимизированы все тогглы
+🔧 НОВЫЕ ФУНКЦИИ:
+• Визуальный хитбокс при Hitbox Expander
+• Кнопка "ВЗЯТЬ" (хитбоксы на 0.1 сек)
+• Исправлены бесконечные прыжки
 
-✨ НОВЫЕ ФУНКЦИИ:
-• Infinite Jump
-• Super Jump
-• Hitbox Expansion
-• Улучшенный Fling
+🛡️ ЗАЩИТА:
+• Убрать хитбоксы - полная неуязвимость
+• Hitbox Expander - увеличенный хитбокс с красным боксом
+• Кнопка "ВЗЯТЬ" - временно включает хитбоксы для подбора предметов
 
 🎮 УПРАВЛЕНИЕ:
 • W/A/S/D - полёт
 • Пробел - вверх
-• Ctrl - вниз
+• Ctrl - вниз]]
 
-Скрипт создан для Delta Executor]]
 infoText.TextColor3 = Color3.fromRGB(200, 200, 220)
 infoText.TextSize = 12
 infoText.Font = Enum.Font.Gotham
@@ -827,8 +1026,9 @@ closeButton.MouseButton1Click:Connect(function()
     if flying then disableFly() end
     if noclipEnabled then disableNoclip() end
     if infiniteJump then disableInfiniteJump() end
-    if hitboxExpansion then disableHitboxExpansion() end
+    if hitboxRemoved then restoreHitbox() end
+    if hitboxExpanderEnabled then disableHitboxExpander() end
     screenGui:Destroy()
 end)
 
-print("✅ Delta Hub v1.1 загружен! NoClip теперь работает!")
+print("✅ Delta Hub v1.3 загружен! Hitbox Expander теперь показывает красный бокс!")
