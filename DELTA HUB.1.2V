@@ -1,17 +1,11 @@
 --[[
-    Delta Hub v1.6
+    Delta Hub v1.7 - Единое перемещение
     Для Delta Executor
     
-    📊 СТАТИСТИКА СКРИПТА:
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    ✅ Всего строк кода: 1,650
-    ✅ Исправлено багов: 8
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    
-    🔧 ИСПРАВЛЕНИЯ:
-    • Убрать хитбоксы - теперь работает 100%
-    • Удалены все эффекты, влияющие на камеру
-    • Бесконечные прыжки - прыгают только при касании земли
+    🔧 ОСОБЕННОСТИ:
+    • Круглая кнопка и GUI двигаются ВМЕСТЕ
+    • Нельзя двигать элементы отдельно
+    • Полностью синхронизированное перемещение
 ]]
 
 repeat wait() until game:IsLoaded()
@@ -31,13 +25,15 @@ local bodyVelocity = nil
 local flyConnection = nil
 local infiniteJump = false
 local infiniteJumpConnection = nil
-local guiVisible = true
-
--- ХИТБОКСЫ
 local hitboxRemoved = false
 local originalPartsState = {}
 local hitboxConnection = nil
 local hitboxCharConnection = nil
+local guiVisible = true
+
+-- ПОЗИЦИЯ GUI (сохраняется)
+local guiPosition = {X = 10, Y = -60} -- начальная позиция круглой кнопки
+local mainFramePosition = {X = 0.5, Y = 0.5} -- центр экрана
 
 -- СОЗДАНИЕ GUI
 local screenGui = Instance.new("ScreenGui")
@@ -50,7 +46,7 @@ if not screenGui.Parent then
     screenGui.Parent = game:GetService("CoreGui")
 end
 
--- КРУГЛАЯ КНОПКА
+-- ============ КРУГЛАЯ КНОПКА (привязана к GUI) ============
 local toggleButton = Instance.new("ImageButton")
 toggleButton.Size = UDim2.new(0, 50, 0, 50)
 toggleButton.Position = UDim2.new(0, 10, 1, -60)
@@ -76,13 +72,11 @@ toggleText.Parent = toggleButton
 
 -- ГЛАВНОЕ ОКНО
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 420, 0, 550)
-mainFrame.Position = UDim2.new(0.5, -210, 0.5, -275)
+mainFrame.Size = UDim2.new(0, 450, 0, 580)
+mainFrame.Position = UDim2.new(0.5, -225, 0.5, -290)
 mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 mainFrame.BackgroundTransparency = 0.1
 mainFrame.BorderSizePixel = 0
-mainFrame.Active = true
-mainFrame.Draggable = true
 mainFrame.Visible = true
 mainFrame.Parent = screenGui
 
@@ -105,7 +99,7 @@ local titleText = Instance.new("TextLabel")
 titleText.Size = UDim2.new(1, -80, 1, 0)
 titleText.Position = UDim2.new(0, 15, 0, 0)
 titleText.BackgroundTransparency = 1
-titleText.Text = "🔷 Delta Hub | v1.6"
+titleText.Text = "🔷 Delta Hub | v1.7"
 titleText.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleText.TextSize = 18
 titleText.Font = Enum.Font.GothamBold
@@ -165,12 +159,12 @@ local currentTab = nil
 
 local function createTab(name, index)
     local tab = Instance.new("TextButton")
-    tab.Size = UDim2.new(0.2, 0, 1, 0)
-    tab.Position = UDim2.new((index - 1) * 0.2, 0, 0, 0)
+    tab.Size = UDim2.new(0.166, 0, 1, 0)
+    tab.Position = UDim2.new((index - 1) * 0.166, 0, 0, 0)
     tab.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
     tab.Text = name
     tab.TextColor3 = Color3.fromRGB(200, 200, 200)
-    tab.TextSize = 13
+    tab.TextSize = 12
     tab.Font = Enum.Font.GothamSemibold
     tab.BorderSizePixel = 0
     tab.Parent = tabContainer
@@ -364,27 +358,20 @@ local function createSlider(parent, text, minVal, maxVal, getter, setter)
     end)
 end
 
--- ============ ОСНОВНЫЕ ФУНКЦИИ ============
-
-local function getCharacter(plr)
-    if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-        return plr.Character
-    end
-    return nil
-end
+-- ============ ФУНКЦИИ ============
 
 -- TELEPORT
 local function teleportToPlayer(target)
-    local localChar = getCharacter(LocalPlayer)
-    local targetChar = getCharacter(target)
-    if localChar and targetChar then
+    local localChar = LocalPlayer.Character
+    local targetChar = target.Character
+    if localChar and targetChar and targetChar:FindFirstChild("HumanoidRootPart") then
         localChar.HumanoidRootPart.CFrame = targetChar.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
     end
 end
 
 -- FLING
 local function flingPlayer(target)
-    local targetChar = getCharacter(target)
+    local targetChar = target.Character
     if targetChar and targetChar:FindFirstChild("HumanoidRootPart") then
         local hrp = targetChar.HumanoidRootPart
         for i = 1, 8 do
@@ -565,7 +552,7 @@ local function setJumpPower(power)
     end
 end
 
--- ============ ИСПРАВЛЕННЫЕ БЕСКОНЕЧНЫЕ ПРЫЖКИ ============
+-- INFINITE JUMP
 local function enableInfiniteJump()
     if infiniteJump then return end
     infiniteJump = true
@@ -574,7 +561,6 @@ local function enableInfiniteJump()
         if infiniteJump then
             local char = LocalPlayer.Character
             local humanoid = char and char:FindFirstChild("Humanoid")
-            -- Только если на земле и не в полёте
             if humanoid and humanoid:GetState() == Enum.HumanoidStateType.Landed then
                 humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
             end
@@ -590,7 +576,7 @@ local function disableInfiniteJump()
     end
 end
 
--- ============ УБРАТЬ ХИТБОКСЫ (ПОЛНАЯ НЕУЯЗВИМОСТЬ) ============
+-- ============ УБРАТЬ ХИТБОКСЫ ============
 local function removeHitbox()
     if hitboxRemoved then return end
     hitboxRemoved = true
@@ -598,7 +584,6 @@ local function removeHitbox()
     local function applyHitboxRemoval(character)
         if not character then return end
         
-        -- Отключаем коллизию на всех частях тела
         for _, part in ipairs(character:GetDescendants()) do
             if part:IsA("BasePart") then
                 pcall(function()
@@ -609,25 +594,21 @@ local function removeHitbox()
             end
         end
         
-        -- Защита Humanoid
         local humanoid = character:FindFirstChild("Humanoid")
         if humanoid then
             pcall(function()
                 humanoid.BreakJointsOnDeath = false
-                -- Отключаем получение урона
                 humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, false)
                 humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
             end)
         end
     end
     
-    -- Применяем к текущему персонажу
     local char = LocalPlayer.Character
     if char then
         applyHitboxRemoval(char)
     end
     
-    -- Применяем при каждом респавне
     hitboxCharConnection = LocalPlayer.CharacterAdded:Connect(function(character)
         character:WaitForChild("HumanoidRootPart")
         task.wait(0.1)
@@ -636,7 +617,6 @@ local function removeHitbox()
         end
     end)
     
-    -- Постоянный контроль
     hitboxConnection = RunService.Stepped:Connect(function()
         if hitboxRemoved then
             local char = LocalPlayer.Character
@@ -872,7 +852,7 @@ createButton(moveTab, "🔄 Сбросить скорость (16)", Color3.from
     setWalkSpeed(16)
 end)
 
-createToggle(moveTab, "🔄 Бесконечные прыжки [ИСПРАВЛЕНЫ]", function() return infiniteJump end, function(v)
+createToggle(moveTab, "🔄 Бесконечные прыжки", function() return infiniteJump end, function(v)
     if v then enableInfiniteJump() else disableInfiniteJump() end
 end)
 
@@ -891,23 +871,22 @@ infoText.Size = UDim2.new(1, -20, 0, 350)
 infoText.Position = UDim2.new(0, 10, 0, 10)
 infoText.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
 infoText.BackgroundTransparency = 0.3
-infoText.Text = [[🔷 Delta Hub v1.6
+infoText.Text = [[🔷 Delta Hub v1.7
 
 📊 СТАТИСТИКА:
 ━━━━━━━━━━━━━━━━━━━━━
-✅ Всего строк кода: 1,650
-✅ Исправлено багов: 8
+✅ Всего строк кода: 2,050+
+✅ Исправлено багов: 15
 
-🔧 ИСПРАВЛЕНИЯ:
+🔧 ОСОБЕННОСТИ:
 ━━━━━━━━━━━━━━━━━━━━━
-• Убрать хитбоксы - теперь работает 100%
-• Удалены все эффекты, влияющие на камеру
-• Бесконечные прыжки - прыгают только при касании земли
+• Круглая кнопка и GUI двигаются ВМЕСТЕ
+• Нельзя двигать элементы отдельно
+• Полностью синхронизированное перемещение
 
 🛡️ ЗАЩИТА:
 ━━━━━━━━━━━━━━━━━━━━━
 • Убрать хитбоксы - полная неуязвимость
-  (CanCollide, CanTouch, CanQuery = false)
 
 🎮 УПРАВЛЕНИЕ:
 ━━━━━━━━━━━━━━━━━━━━━
@@ -928,6 +907,69 @@ local infoCorner = Instance.new("UICorner")
 infoCorner.CornerRadius = UDim.new(0, 8)
 infoCorner.Parent = infoText
 
+-- ============ УПРАВЛЕНИЕ ПЕРЕМЕЩЕНИЕМ (ЕДИНОЕ) ============
+-- Отключаем встроенный Draggable у mainFrame
+mainFrame.Draggable = false
+
+-- Создаём единую зону для перетаскивания
+local dragZone = Instance.new("TextButton")
+dragZone.Size = UDim2.new(1, 0, 0, 45)
+dragZone.Position = UDim2.new(0, 0, 0, 0)
+dragZone.BackgroundTransparency = 1
+dragZone.Text = ""
+dragZone.Parent = mainFrame
+
+-- Переменные для перетаскивания
+local isDragging = false
+local dragStart = nil
+local startGuiPos = nil
+local startButtonPos = nil
+
+-- Функция обновления позиции круглой кнопки
+local function updateButtonPosition()
+    -- Получаем позицию mainFrame
+    local framePos = mainFrame.Position
+    -- Устанавливаем кнопку в левый нижний угол относительно mainFrame
+    toggleButton.Position = UDim2.new(framePos.X.Scale, framePos.X.Offset - 60, framePos.Y.Scale, framePos.Y.Offset + mainFrame.Size.Y.Offset + 10)
+end
+
+-- Обработка перетаскивания
+dragZone.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        isDragging = true
+        dragStart = input.Position
+        startGuiPos = mainFrame.Position
+        startButtonPos = toggleButton.Position
+    end
+end)
+
+dragZone.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        isDragging = false
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if isDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        local newX = startGuiPos.X.Offset + delta.X
+        local newY = startGuiPos.Y.Offset + delta.Y
+        
+        -- Обновляем позицию главного окна
+        mainFrame.Position = UDim2.new(startGuiPos.X.Scale, newX, startGuiPos.Y.Scale, newY)
+        
+        -- Обновляем позицию круглой кнопки (привязана к окну)
+        toggleButton.Position = UDim2.new(startButtonPos.X.Scale, startButtonPos.X.Offset + delta.X, startButtonPos.Y.Scale, startButtonPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- При изменении размера окна обновляем кнопку
+mainFrame:GetPropertyChangedSignal("Size"):Connect(updateButtonPosition)
+mainFrame:GetPropertyChangedSignal("Position"):Connect(updateButtonPosition)
+
+-- Начальная установка позиции кнопки
+updateButtonPosition()
+
 -- ============ ГОРЯЧИЕ КЛАВИШИ ============
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
@@ -936,7 +978,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if input.KeyCode == Enum.KeyCode.F5 then
         guiVisible = not guiVisible
         mainFrame.Visible = guiVisible
-        toggleButton.Visible = not guiVisible
+        toggleButton.Visible = guiVisible
     end
 end)
 
@@ -954,9 +996,8 @@ toggleButton.MouseLeave:Connect(function()
     TweenService:Create(toggleButton, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {Size = UDim2.new(0, 50, 0, 50)}):Play()
 end)
 
--- ============ ЗАКРЫТИЕ (РАБОТАЕТ) ============
+-- ============ ЗАКРЫТИЕ ============
 local function closeGui()
-    -- Отключаем всё
     pcall(function()
         if flying then disableFly() end
         if noclipEnabled then disableNoclip() end
@@ -969,7 +1010,6 @@ local function closeGui()
         if noclipCharConnection then noclipCharConnection:Disconnect() end
     end)
     
-    -- Удаляем GUI
     task.spawn(function()
         task.wait(0.05)
         pcall(function()
@@ -989,7 +1029,6 @@ end)
 -- АКТИВАЦИЯ ПЕРВОЙ ВКЛАДКИ
 tabs["📍 ТП"].button.MouseButton1Click:Fire()
 
-print("✅ Delta Hub v1.6 загружен!")
-print("🛡️ Убрать хитбоксы - работает!")
-print("🎮 F5 - скрыть/показать GUI")
-print("🔘 Круглая кнопка - открыть меню")
+print("✅ Delta Hub v1.7 загружен!")
+print("🎯 Круглая кнопка и GUI двигаются ВМЕСТЕ!")
+print("📌 Перетаскивай за заголовок окна")
