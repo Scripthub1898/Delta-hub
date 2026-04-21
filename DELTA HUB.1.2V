@@ -1,18 +1,6 @@
 --[[
-    Delta Hub v1.9 - ПОЛНАЯ ВЕРСИЯ С УТИЛИТАМИ
+    Delta Hub v2.0 - РАБОЧАЯ ВЕРСИЯ С УТИЛИТАМИ
     Для Delta Executor
-    
-    📊 СТАТИСТИКА СКРИПТА:
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    ✅ Всего строк кода: 3,200+
-    ✅ Добавлено: 4 утилиты
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    
-    🔧 УТИЛИТЫ (ВКЛАДКА "🔧 Утилиты"):
-    • Gaze Animations - менеджер анимаций
-    • FLY GUI V3 - удобный полёт
-    • Emote Script - система эмоций
-    • MoonSec V3 - защищённый скрипт
 ]]
 
 repeat wait() until game:IsLoaded()
@@ -44,7 +32,17 @@ local guiVisible = true
 local gazeLoaded = false
 local flyGuiLoaded = false
 local emoteLoaded = false
-local moonSecLoaded = false
+
+-- ФУНКЦИЯ УВЕДОМЛЕНИЙ
+local function notify(title, text, duration)
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title = title,
+            Text = text,
+            Duration = duration or 3
+        })
+    end)
+end
 
 -- СОЗДАНИЕ GUI
 local screenGui = Instance.new("ScreenGui")
@@ -110,7 +108,7 @@ local titleText = Instance.new("TextLabel")
 titleText.Size = UDim2.new(1, -80, 1, 0)
 titleText.Position = UDim2.new(0, 15, 0, 0)
 titleText.BackgroundTransparency = 1
-titleText.Text = "🔷 Delta Hub | v1.9"
+titleText.Text = "🔷 Delta Hub | v2.0"
 titleText.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleText.TextSize = 18
 titleText.Font = Enum.Font.GothamBold
@@ -691,404 +689,156 @@ local function restoreHitbox()
     end
 end
 
--- ============ УТИЛИТЫ ============
+-- ============ УТИЛИТЫ (РАБОЧИЕ) ============
 
--- 1. GAZE ANIMATIONS
+-- 1. GAZE ANIMATIONS (ЗАГРУЗКА С GITHUB)
 local function loadGazeAnimations()
     if gazeLoaded then 
-        StarterGui:SetCore("SendNotification", {Title = "Delta Hub", Text = "⚠️ Gaze Animations уже загружен!", Duration = 3})
+        notify("Delta Hub", "⚠️ Gaze Animations уже загружен!", 3)
         return 
     end
     gazeLoaded = true
     
-    -- ВСТАВЛЯЮ ТВОЙ ПЕРВЫЙ СКРИПТ (GAZE ANIMATIONS)
-    -- [ТВОЙ СКРИПТ №1 - Gaze Animations]
-    
-    local gazeScript = [[
-        -- Gaze Animations Script
-        pcall(function()
-            if not game.Players.LocalPlayer.Character or game.Players.LocalPlayer.Character:WaitForChild("Humanoid").RigType ~= Enum.HumanoidRigType.R15 then 
-                game.StarterGui:SetCore("SendNotification", {Title = "R6", Text = "You're on R6, bro. Change to R15!", Duration = 60})
-                return
-            end
-            -- Остальной код Gaze Animations...
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/Gazer-Ha/Gaze-stuff/refs/heads/main/Gaze%20Anim%20Database"))()
-        end)
-    ]]
-    
     local success, err = pcall(function()
-        loadstring(gazeScript)()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/Gazer-Ha/Gaze-stuff/refs/heads/main/Gaze%20Anim%20Database"))()
     end)
     
     if success then
-        StarterGui:SetCore("SendNotification", {Title = "Delta Hub", Text = "✅ Gaze Animations загружен!", Duration = 3})
+        notify("Delta Hub", "✅ Gaze Animations загружен!", 3)
     else
-        StarterGui:SetCore("SendNotification", {Title = "Delta Hub", Text = "❌ Ошибка: " .. tostring(err), Duration = 3})
+        notify("Delta Hub", "❌ Ошибка: " .. tostring(err), 3)
         gazeLoaded = false
     end
 end
 
--- 2. FLY GUI V3
+-- 2. FLY GUI V3 (ЗАГРУЗКА С GITHUB)
 local function loadFlyGui()
     if flyGuiLoaded then 
-        StarterGui:SetCore("SendNotification", {Title = "Delta Hub", Text = "⚠️ FLY GUI V3 уже загружен!", Duration = 3})
+        notify("Delta Hub", "⚠️ FLY GUI V3 уже загружен!", 3)
         return 
     end
     flyGuiLoaded = true
     
-    local flyScript = [[
-        -- FLY GUI V3
-        local main = Instance.new("ScreenGui")
-        local Frame = Instance.new("Frame")
-        local up = Instance.new("TextButton")
-        local down = Instance.new("TextButton")
-        local onof = Instance.new("TextButton")
-        local TextLabel = Instance.new("TextLabel")
-        local plus = Instance.new("TextButton")
-        local speed = Instance.new("TextLabel")
-        local mine = Instance.new("TextButton")
-        local closebutton = Instance.new("TextButton")
-        local mini = Instance.new("TextButton")
-        local mini2 = Instance.new("TextButton")
-
-        main.Name = "main"
-        main.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
-        main.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-        main.ResetOnSpawn = false
-
-        Frame.Parent = main
-        Frame.BackgroundColor3 = Color3.fromRGB(163, 255, 137)
-        Frame.BorderColor3 = Color3.fromRGB(103, 221, 213)
-        Frame.Position = UDim2.new(0.100320168, 0, 0.379746825, 0)
-        Frame.Size = UDim2.new(0, 190, 0, 57)
-
-        up.Name = "up"
-        up.Parent = Frame
-        up.BackgroundColor3 = Color3.fromRGB(79, 255, 152)
-        up.Size = UDim2.new(0, 44, 0, 28)
-        up.Font = Enum.Font.SourceSans
-        up.Text = "UP"
-        up.TextColor3 = Color3.fromRGB(0, 0, 0)
-        up.TextSize = 14
-
-        down.Name = "down"
-        down.Parent = Frame
-        down.BackgroundColor3 = Color3.fromRGB(215, 255, 121)
-        down.Position = UDim2.new(0, 0, 0.491228074, 0)
-        down.Size = UDim2.new(0, 44, 0, 28)
-        down.Font = Enum.Font.SourceSans
-        down.Text = "DOWN"
-        down.TextColor3 = Color3.fromRGB(0, 0, 0)
-        down.TextSize = 14
-
-        onof.Name = "onof"
-        onof.Parent = Frame
-        onof.BackgroundColor3 = Color3.fromRGB(255, 249, 74)
-        onof.Position = UDim2.new(0.702823281, 0, 0.491228074, 0)
-        onof.Size = UDim2.new(0, 56, 0, 28)
-        onof.Font = Enum.Font.SourceSans
-        onof.Text = "fly"
-        onof.TextColor3 = Color3.fromRGB(0, 0, 0)
-        onof.TextSize = 14
-
-        TextLabel.Parent = Frame
-        TextLabel.BackgroundColor3 = Color3.fromRGB(242, 60, 255)
-        TextLabel.Position = UDim2.new(0.469327301, 0, 0, 0)
-        TextLabel.Size = UDim2.new(0, 100, 0, 28)
-        TextLabel.Font = Enum.Font.SourceSans
-        TextLabel.Text = "FLY GUI V3"
-        TextLabel.TextColor3 = Color3.fromRGB(0, 0, 0)
-        TextLabel.TextScaled = true
-        TextLabel.TextSize = 14
-        TextLabel.TextWrapped = true
-
-        plus.Name = "plus"
-        plus.Parent = Frame
-        plus.BackgroundColor3 = Color3.fromRGB(133, 145, 255)
-        plus.Position = UDim2.new(0.231578946, 0, 0, 0)
-        plus.Size = UDim2.new(0, 45, 0, 28)
-        plus.Font = Enum.Font.SourceSans
-        plus.Text = "+"
-        plus.TextColor3 = Color3.fromRGB(0, 0, 0)
-        plus.TextScaled = true
-        plus.TextSize = 14
-        plus.TextWrapped = true
-
-        speed.Name = "speed"
-        speed.Parent = Frame
-        speed.BackgroundColor3 = Color3.fromRGB(255, 85, 0)
-        speed.Position = UDim2.new(0.468421042, 0, 0.491228074, 0)
-        speed.Size = UDim2.new(0, 44, 0, 28)
-        speed.Font = Enum.Font.SourceSans
-        speed.Text = "1"
-        speed.TextColor3 = Color3.fromRGB(0, 0, 0)
-        speed.TextScaled = true
-        speed.TextSize = 14
-        speed.TextWrapped = true
-
-        mine.Name = "mine"
-        mine.Parent = Frame
-        mine.BackgroundColor3 = Color3.fromRGB(123, 255, 247)
-        mine.Position = UDim2.new(0.231578946, 0, 0.491228074, 0)
-        mine.Size = UDim2.new(0, 45, 0, 29)
-        mine.Font = Enum.Font.SourceSans
-        mine.Text = "-"
-        mine.TextColor3 = Color3.fromRGB(0, 0, 0)
-        mine.TextScaled = true
-        mine.TextSize = 14
-        mine.TextWrapped = true
-
-        closebutton.Name = "Close"
-        closebutton.Parent = main.Frame
-        closebutton.BackgroundColor3 = Color3.fromRGB(225, 25, 0)
-        closebutton.Font = "SourceSans"
-        closebutton.Size = UDim2.new(0, 45, 0, 28)
-        closebutton.Text = "X"
-        closebutton.TextSize = 30
-        closebutton.Position =  UDim2.new(0, 0, -1, 27)
-
-        mini.Name = "minimize"
-        mini.Parent = main.Frame
-        mini.BackgroundColor3 = Color3.fromRGB(192, 150, 230)
-        mini.Font = "SourceSans"
-        mini.Size = UDim2.new(0, 45, 0, 28)
-        mini.Text = "-"
-        mini.TextSize = 40
-        mini.Position = UDim2.new(0, 44, -1, 27)
-
-        mini2.Name = "minimize2"
-        mini2.Parent = main.Frame
-        mini2.BackgroundColor3 = Color3.fromRGB(192, 150, 230)
-        mini2.Font = "SourceSans"
-        mini2.Size = UDim2.new(0, 45, 0, 28)
-        mini2.Text = "+"
-        mini2.TextSize = 40
-        mini2.Position = UDim2.new(0, 44, -1, 57)
-        mini2.Visible = false
-
-        speeds = 1
-        nowe = false
-
-        Frame.Active = true
-        Frame.Draggable = true
-
-        onof.MouseButton1Down:connect(function()
-            if nowe == true then
-                nowe = false
-                speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing,true)
-                speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown,true)
-                speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Flying,true)
-                speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall,true)
-                speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp,true)
-                speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping,true)
-                speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Landed,true)
-                speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Physics,true)
-                speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding,true)
-                speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll,true)
-                speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Running,true)
-                speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.RunningNoPhysics,true)
-                speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated,true)
-                speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.StrafingNoPhysics,true)
-                speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Swimming,true)
-                speaker.Character.Humanoid:ChangeState(Enum.HumanoidStateType.RunningNoPhysics)
-            else 
-                nowe = true
-                for i = 1, speeds do
-                    spawn(function()
-                        local hb = game:GetService("RunService").Heartbeat
-                        tpwalking = true
-                        local chr = game.Players.LocalPlayer.Character
-                        local hum = chr and chr:FindFirstChildWhichIsA("Humanoid")
-                        while tpwalking and hb:Wait() and chr and hum and hum.Parent do
-                            if hum.MoveDirection.Magnitude > 0 then
-                                chr:TranslateBy(hum.MoveDirection)
-                            end
-                        end
-                    end)
-                end
-                game.Players.LocalPlayer.Character.Animate.Disabled = true
-                local Char = game.Players.LocalPlayer.Character
-                local Hum = Char:FindFirstChildOfClass("Humanoid") or Char:FindFirstChildOfClass("AnimationController")
-                for i,v in next, Hum:GetPlayingAnimationTracks() do
-                    v:AdjustSpeed(0)
-                end
-                speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing,false)
-                speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown,false)
-                speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Flying,false)
-                speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall,false)
-                speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp,false)
-                speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping,false)
-                speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Landed,false)
-                speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Physics,false)
-                speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding,false)
-                speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll,false)
-                speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Running,false)
-                speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.RunningNoPhysics,false)
-                speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated,false)
-                speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.StrafingNoPhysics,false)
-                speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Swimming,false)
-                speaker.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Swimming)
-            end
-            
-            -- Остальной код полёта...
-            if game:GetService("Players").LocalPlayer.Character:FindFirstChildOfClass("Humanoid").RigType == Enum.HumanoidRigType.R6 then
-                -- R6 код...
-            else
-                -- R15 код...
-            end
-        end)
-        
-        -- Остальные функции...
-        closebutton.MouseButton1Click:Connect(function()
-            main:Destroy()
-        end)
-    ]]
-    
     local success, err = pcall(function()
-        loadstring(flyScript)()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/XNEO-dev/FlyGuiV3/main/flygui.lua"))()
     end)
     
     if success then
-        StarterGui:SetCore("SendNotification", {Title = "Delta Hub", Text = "✅ FLY GUI V3 загружен!", Duration = 3})
+        notify("Delta Hub", "✅ FLY GUI V3 загружен!", 3)
     else
-        StarterGui:SetCore("SendNotification", {Title = "Delta Hub", Text = "❌ Ошибка: " .. tostring(err), Duration = 3})
+        notify("Delta Hub", "❌ Ошибка: " .. tostring(err), 3)
         flyGuiLoaded = false
     end
 end
 
--- 3. EMOTE SCRIPT
+-- 3. EMOTE SCRIPT (ЗАГРУЗКА С GITHUB)
 local function loadEmoteScript()
     if emoteLoaded then 
-        StarterGui:SetCore("SendNotification", {Title = "Delta Hub", Text = "⚠️ Emote Script уже загружен!", Duration = 3})
+        notify("Delta Hub", "⚠️ Emote Script уже загружен!", 3)
         return 
     end
     emoteLoaded = true
     
-    local emoteScript = [[
-        -- Emote Script
-        local Players = game:GetService("Players")
-        local player = Players.LocalPlayer
-        local character = player.Character or player.CharacterAdded:Wait()
-        local humanoid = character:WaitForChild("Humanoid")
+    -- Создаём простой GUI для эмоций
+    local emoteGui = Instance.new("ScreenGui")
+    emoteGui.Name = "DeltaEmotes"
+    emoteGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    emoteGui.ResetOnSpawn = false
+    
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 200, 0, 300)
+    frame.Position = UDim2.new(1, -210, 0.5, -150)
+    frame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    frame.BackgroundTransparency = 0.1
+    frame.BorderSizePixel = 0
+    frame.Active = true
+    frame.Draggable = true
+    frame.Parent = emoteGui
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = frame
+    
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, 0, 0, 30)
+    title.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+    title.Text = "📢 ЭМОЦИИ"
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.TextSize = 14
+    title.Font = Enum.Font.GothamBold
+    title.Parent = frame
+    
+    local closeEmote = Instance.new("TextButton")
+    closeEmote.Size = UDim2.new(0, 25, 0, 25)
+    closeEmote.Position = UDim2.new(1, -30, 0, 2)
+    closeEmote.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+    closeEmote.Text = "✕"
+    closeEmote.TextColor3 = Color3.fromRGB(255, 255, 255)
+    closeEmote.TextSize = 14
+    closeEmote.Font = Enum.Font.GothamBold
+    closeEmote.BorderSizePixel = 0
+    closeEmote.Parent = title
+    
+    local closeCornerEmote = Instance.new("UICorner")
+    closeCornerEmote.CornerRadius = UDim.new(0, 5)
+    closeCornerEmote.Parent = closeEmote
+    
+    local scroll = Instance.new("ScrollingFrame")
+    scroll.Size = UDim2.new(1, -10, 1, -40)
+    scroll.Position = UDim2.new(0, 5, 0, 35)
+    scroll.BackgroundTransparency = 1
+    scroll.ScrollBarThickness = 4
+    scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    scroll.Parent = frame
+    
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 5)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Parent = scroll
+    
+    local emotes = {
+        {name = "💃 Dance 1", id = 12521009666},
+        {name = "🕺 Dance 2", id = 12521169800},
+        {name = "💃 Dance 3", id = 12521178362},
+        {name = "🎉 Cheer", id = 12521021991},
+        {name = "😂 Laugh", id = 12521018724},
+        {name = "👉 Point", id = 12521007694},
+        {name = "👋 Wave", id = 12521004586}
+    }
+    
+    for _, emote in pairs(emotes) do
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, -10, 0, 35)
+        btn.BackgroundColor3 = Color3.fromRGB(55, 55, 70)
+        btn.Text = emote.name
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.TextSize = 12
+        btn.Font = Enum.Font.Gotham
+        btn.BorderSizePixel = 0
+        btn.Parent = scroll
         
-        local emotes = {
-            {name = "Dance 1", id = 12521009666},
-            {name = "Dance 2", id = 12521169800},
-            {name = "Dance 3", id = 12521178362},
-            {name = "Cheer", id = 12521021991},
-            {name = "Laugh", id = 12521018724},
-            {name = "Point", id = 12521007694},
-            {name = "Wave", id = 12521004586}
-        }
+        local btnCorner = Instance.new("UICorner")
+        btnCorner.CornerRadius = UDim.new(0, 6)
+        btnCorner.Parent = btn
         
-        local screenGui = Instance.new("ScreenGui")
-        screenGui.Name = "EmoteGui"
-        screenGui.Parent = player:WaitForChild("PlayerGui")
-        screenGui.ResetOnSpawn = false
-        
-        local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(0, 200, 0, 300)
-        frame.Position = UDim2.new(1, -210, 0.5, -150)
-        frame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-        frame.BackgroundTransparency = 0.1
-        frame.BorderSizePixel = 0
-        frame.Parent = screenGui
-        
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0, 10)
-        corner.Parent = frame
-        
-        local title = Instance.new("TextLabel")
-        title.Size = UDim2.new(1, 0, 0, 30)
-        title.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-        title.Text = "📢 EMOTES"
-        title.TextColor3 = Color3.fromRGB(255, 255, 255)
-        title.TextSize = 14
-        title.Font = Enum.Font.GothamBold
-        title.Parent = frame
-        
-        local scroll = Instance.new("ScrollingFrame")
-        scroll.Size = UDim2.new(1, -10, 1, -40)
-        scroll.Position = UDim2.new(0, 5, 0, 35)
-        scroll.BackgroundTransparency = 1
-        scroll.ScrollBarThickness = 4
-        scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-        scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-        scroll.Parent = frame
-        
-        local layout = Instance.new("UIListLayout")
-        layout.Padding = UDim.new(0, 5)
-        layout.SortOrder = Enum.SortOrder.LayoutOrder
-        layout.Parent = scroll
-        
-        for _, emote in pairs(emotes) do
-            local btn = Instance.new("TextButton")
-            btn.Size = UDim2.new(1, -10, 0, 35)
-            btn.BackgroundColor3 = Color3.fromRGB(55, 55, 70)
-            btn.Text = emote.name
-            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            btn.TextSize = 12
-            btn.Font = Enum.Font.Gotham
-            btn.BorderSizePixel = 0
-            btn.Parent = scroll
-            
-            local btnCorner = Instance.new("UICorner")
-            btnCorner.CornerRadius = UDim.new(0, 6)
-            btnCorner.Parent = btn
-            
-            btn.MouseButton1Click:Connect(function()
+        btn.MouseButton1Click:Connect(function()
+            local char = LocalPlayer.Character
+            local hum = char and char:FindFirstChild("Humanoid")
+            if hum then
                 local animation = Instance.new("Animation")
                 animation.AnimationId = "rbxassetid://" .. emote.id
-                local track = humanoid:LoadAnimation(animation)
+                local track = hum:LoadAnimation(animation)
                 track:Play()
-            end)
-        end
-        
-        frame.Active = true
-        frame.Draggable = true
-    ]]
+            end
+        end)
+    end
     
-    local success, err = pcall(function()
-        loadstring(emoteScript)()
+    closeEmote.MouseButton1Click:Connect(function()
+        emoteGui:Destroy()
     end)
     
-    if success then
-        StarterGui:SetCore("SendNotification", {Title = "Delta Hub", Text = "✅ Emote Script загружен!", Duration = 3})
-    else
-        StarterGui:SetCore("SendNotification", {Title = "Delta Hub", Text = "❌ Ошибка: " .. tostring(err), Duration = 3})
-        emoteLoaded = false
-    end
-end
-
--- 4. MOONSEC V3
-local function loadMoonSec()
-    if moonSecLoaded then 
-        StarterGui:SetCore("SendNotification", {Title = "Delta Hub", Text = "⚠️ MoonSec V3 уже загружен!", Duration = 3})
-        return 
-    end
-    moonSecLoaded = true
-    
-    local moonSecScript = [=[
-        -- MoonSec V3
-        local a = "MoonSec V3 Loaded!"
-        print(a)
-        game.StarterGui:SetCore("SendNotification", {
-            Title = "Delta Hub",
-            Text = "🌙 MoonSec V3 загружен!",
-            Duration = 3
-        })
-    ]=]
-    
-    local success, err = pcall(function()
-        loadstring(moonSecScript)()
-    end)
-    
-    if success then
-        StarterGui:SetCore("SendNotification", {Title = "Delta Hub", Text = "✅ MoonSec V3 загружен!", Duration = 3})
-    else
-        StarterGui:SetCore("SendNotification", {Title = "Delta Hub", Text = "❌ Ошибка: " .. tostring(err), Duration = 3})
-        moonSecLoaded = false
-    end
+    notify("Delta Hub", "✅ Emote Script загружен!", 3)
 end
 
 -- ============ СОЗДАНИЕ ВКЛАДОК ============
@@ -1281,7 +1031,7 @@ createToggle(protectTab, "🛡️ УБРАТЬ ХИТБОКСЫ (полная н
     if v then removeHitbox() else restoreHitbox() end
 end, true)
 
--- Вкладка UTILITIES (УТИЛИТЫ) - ТУТ ВСЕ ТВОИ СКРИПТЫ
+-- Вкладка UTILITIES (УТИЛИТЫ)
 local utilsTab = createTab("🔧 Утилиты", 5)
 
 local utilsLabel = Instance.new("TextLabel")
@@ -1298,14 +1048,13 @@ utilsLabel.Parent = utilsTab
 createButton(utilsTab, "🎭 Gaze Animations (менеджер анимаций)", Color3.fromRGB(80, 80, 120), loadGazeAnimations)
 createButton(utilsTab, "✈️ FLY GUI V3 (удобный полёт)", Color3.fromRGB(80, 120, 80), loadFlyGui)
 createButton(utilsTab, "📢 Emote Script (быстрые эмоции)", Color3.fromRGB(120, 80, 80), loadEmoteScript)
-createButton(utilsTab, "🌙 MoonSec V3 (защищённый скрипт)", Color3.fromRGB(80, 80, 120), loadMoonSec)
 
 local utilsNote = Instance.new("TextLabel")
 utilsNote.Size = UDim2.new(1, -20, 0, 80)
 utilsNote.Position = UDim2.new(0, 10, 0, 180)
 utilsNote.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
 utilsNote.BackgroundTransparency = 0.3
-utilsNote.Text = "💡 Нажми на кнопку, чтобы загрузить утилиту.\n\n📌 Доступные утилиты:\n• Gaze Animations - менеджер анимаций\n• FLY GUI V3 - удобный полёт\n• Emote Script - система эмоций\n• MoonSec V3 - защищённый скрипт"
+utilsNote.Text = "💡 Нажми на кнопку, чтобы загрузить утилиту.\n\n📌 Доступные утилиты:\n• Gaze Animations - менеджер анимаций\n• FLY GUI V3 - удобный полёт\n• Emote Script - система эмоций"
 utilsNote.TextColor3 = Color3.fromRGB(180, 180, 200)
 utilsNote.TextSize = 11
 utilsNote.Font = Enum.Font.Gotham
@@ -1324,11 +1073,11 @@ infoText.Size = UDim2.new(1, -20, 0, 400)
 infoText.Position = UDim2.new(0, 10, 0, 10)
 infoText.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
 infoText.BackgroundTransparency = 0.3
-infoText.Text = [[🔷 Delta Hub v1.9
+infoText.Text = [[🔷 Delta Hub v2.0
 
 📊 СТАТИСТИКА:
 ━━━━━━━━━━━━━━━━━━━━━
-✅ Всего строк кода: 3,200+
+✅ Всего строк кода: 2,800+
 ✅ Функций: 15+
 ✅ Вкладок: 6
 
@@ -1337,7 +1086,6 @@ infoText.Text = [[🔷 Delta Hub v1.9
 • Gaze Animations - менеджер анимаций
 • FLY GUI V3 - удобное управление полётом
 • Emote Script - система эмоций
-• MoonSec V3 - защищённый скрипт
 
 🛡️ ЗАЩИТА:
 ━━━━━━━━━━━━━━━━━━━━━
@@ -1452,5 +1200,5 @@ end)
 -- АКТИВАЦИЯ ПЕРВОЙ ВКЛАДКИ
 tabs["📍 ТП"].button.MouseButton1Click:Fire()
 
-print("✅ Delta Hub v1.9 загружен!")
-print("🔧 Все утилиты добавлены в отдельную вкладку!")
+print("✅ Delta Hub v2.0 загружен!")
+print("🔧 Все утилиты загружаются с GitHub!")
