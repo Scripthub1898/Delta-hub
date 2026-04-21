@@ -1,0 +1,572 @@
+--[[
+    DELTA PROTECT v5.1 - ИСПРАВЛЕННАЯ ВЕРСИЯ
+    Починил кнопку закрытия и добавил горячие клавиши
+]]
+
+repeat wait() until game:IsLoaded()
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local Lighting = game:GetService("Lighting")
+local VirtualUser = game:GetService("VirtualUser")
+
+-- ============ ПЕРЕМЕННЫЕ ============
+local flying = false
+local noclipEnabled = false
+local flySpeed = 50
+local originalSpeed = 16
+local bodyVelocity = nil
+local flyConnection = nil
+local infiniteJumpEnabled = false
+local hitboxProtection = false
+local invisibilityEnabled = false
+local originalTransparencies = {}
+local characterConnection = nil
+local guiEnabled = true
+
+-- ============ СОЗДАНИЕ GUI ============
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "DeltaProtect"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+pcall(function() 
+    screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") 
+end)
+
+if not screenGui.Parent then
+    pcall(function() 
+        screenGui.Parent = game:GetService("CoreGui") 
+    end)
+end
+
+if not screenGui.Parent then
+    screenGui.Parent = game:GetService("StarterGui")
+end
+
+-- Главное окно
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 420, 0, 550)
+mainFrame.Position = UDim2.new(0.5, -210, 0.5, -275)
+mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+mainFrame.BackgroundTransparency = 0.05
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.ClipsDescendants = true
+mainFrame.Parent = screenGui
+
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0, 12)
+mainCorner.Parent = mainFrame
+
+-- Заголовок
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 50)
+titleBar.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
+titleBar.BorderSizePixel = 0
+titleBar.Parent = mainFrame
+
+local titleCorner = Instance.new("UICorner")
+titleCorner.CornerRadius = UDim.new(0, 12)
+titleCorner.Parent = titleBar
+
+local titleText = Instance.new("TextLabel")
+titleText.Size = UDim2.new(1, -80, 1, 0)
+titleText.Position = UDim2.new(0, 15, 0, 0)
+titleText.BackgroundTransparency = 1
+titleText.Text = "🛡️ DELTA PROTECT"
+titleText.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleText.TextSize = 18
+titleText.Font = Enum.Font.GothamBold
+titleText.TextXAlignment = Enum.TextXAlignment.Left
+titleText.Parent = titleBar
+
+-- Кнопка закрытия (ИСПРАВЛЕНА)
+local closeButton = Instance.new("TextButton")
+closeButton.Size = UDim2.new(0, 32, 0, 32)
+closeButton.Position = UDim2.new(1, -42, 0, 9)
+closeButton.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+closeButton.Text = "✕"
+closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeButton.TextSize = 18
+closeButton.Font = Enum.Font.GothamBold
+closeButton.BorderSizePixel = 0
+closeButton.AutoButtonColor = true
+closeButton.Parent = titleBar
+
+local closeCorner = Instance.new("UICorner")
+closeCorner.CornerRadius = UDim.new(0, 8)
+closeCorner.Parent = closeButton
+
+-- Кнопка минимизации
+local minButton = Instance.new("TextButton")
+minButton.Size = UDim2.new(0, 32, 0, 32)
+minButton.Position = UDim2.new(1, -80, 0, 9)
+minButton.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+minButton.Text = "−"
+minButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+minButton.TextSize = 18
+minButton.Font = Enum.Font.GothamBold
+minButton.BorderSizePixel = 0
+minButton.Parent = titleBar
+
+local minCorner = Instance.new("UICorner")
+minCorner.CornerRadius = UDim.new(0, 8)
+minCorner.Parent = minButton
+
+-- Контейнер для содержимого
+local contentContainer = Instance.new("Frame")
+contentContainer.Size = UDim2.new(1, 0, 1, -50)
+contentContainer.Position = UDim2.new(0, 0, 0, 50)
+contentContainer.BackgroundTransparency = 1
+contentContainer.Parent = mainFrame
+
+-- Текст приветствия
+local welcomeLabel = Instance.new("TextLabel")
+welcomeLabel.Size = UDim2.new(1, -40, 0, 200)
+welcomeLabel.Position = UDim2.new(0, 20, 0, 20)
+welcomeLabel.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+welcomeLabel.BackgroundTransparency = 0.2
+welcomeLabel.Text = "🛡️ DELTA PROTECT v5.1\n\n✅ Защита хитбоксов - ВКЛ\n✅ Инвиз - ВКЛ\n✅ Полёт - W A S D + Пробел\n✅ NoClip\n\nНажми [F5] чтобы скрыть/показать\nНажми [F6] для защиты хитбоксов"
+welcomeLabel.TextColor3 = Color3.fromRGB(200, 200, 230)
+welcomeLabel.TextSize = 13
+welcomeLabel.Font = Enum.Font.Gotham
+welcomeLabel.TextWrapped = true
+welcomeLabel.TextXAlignment = Enum.TextXAlignment.Center
+welcomeLabel.Parent = contentContainer
+
+local welcomeCorner = Instance.new("UICorner")
+welcomeCorner.CornerRadius = UDim.new(0, 10)
+welcomeCorner.Parent = welcomeLabel
+
+-- Кнопки быстрого доступа
+local protectBtn = Instance.new("TextButton")
+protectBtn.Size = UDim2.new(0.45, -10, 0, 45)
+protectBtn.Position = UDim2.new(0, 20, 0, 240)
+protectBtn.BackgroundColor3 = Color3.fromRGB(80, 50, 50)
+protectBtn.Text = "🛡️ ЗАЩИТА"
+protectBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+protectBtn.TextSize = 14
+protectBtn.Font = Enum.Font.GothamBold
+protectBtn.BorderSizePixel = 0
+protectBtn.Parent = contentContainer
+
+local protectCorner = Instance.new("UICorner")
+protectCorner.CornerRadius = UDim.new(0, 8)
+protectCorner.Parent = protectBtn
+
+local invisBtn = Instance.new("TextButton")
+invisBtn.Size = UDim2.new(0.45, -10, 0, 45)
+invisBtn.Position = UDim2.new(0.55, -10, 0, 240)
+invisBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 80)
+invisBtn.Text = "👻 ИНВИЗ"
+invisBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+invisBtn.TextSize = 14
+invisBtn.Font = Enum.Font.GothamBold
+invisBtn.BorderSizePixel = 0
+invisBtn.Parent = contentContainer
+
+local invisCorner = Instance.new("UICorner")
+invisCorner.CornerRadius = UDim.new(0, 8)
+invisCorner.Parent = invisBtn
+
+local flyBtn = Instance.new("TextButton")
+flyBtn.Size = UDim2.new(0.45, -10, 0, 45)
+flyBtn.Position = UDim2.new(0, 20, 0, 300)
+flyBtn.BackgroundColor3 = Color3.fromRGB(50, 80, 50)
+flyBtn.Text = "✈️ ПОЛЁТ"
+flyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+flyBtn.TextSize = 14
+flyBtn.Font = Enum.Font.GothamBold
+flyBtn.BorderSizePixel = 0
+flyBtn.Parent = contentContainer
+
+local flyCorner = Instance.new("UICorner")
+flyCorner.CornerRadius = UDim.new(0, 8)
+flyCorner.Parent = flyBtn
+
+local noclipBtn = Instance.new("TextButton")
+noclipBtn.Size = UDim2.new(0.45, -10, 0, 45)
+noclipBtn.Position = UDim2.new(0.55, -10, 0, 300)
+noclipBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 50)
+noclipBtn.Text = "🚪 NOCLIP"
+noclipBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+noclipBtn.TextSize = 14
+noclipBtn.Font = Enum.Font.GothamBold
+noclipBtn.BorderSizePixel = 0
+noclipBtn.Parent = contentContainer
+
+local noclipCorner = Instance.new("UICorner")
+noclipCorner.CornerRadius = UDim.new(0, 8)
+noclipCorner.Parent = noclipBtn
+
+-- Статус бар
+local statusBar = Instance.new("Frame")
+statusBar.Size = UDim2.new(1, -40, 0, 35)
+statusBar.Position = UDim2.new(0, 20, 1, -55)
+statusBar.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+statusBar.BackgroundTransparency = 0.3
+statusBar.BorderSizePixel = 0
+statusBar.Parent = contentContainer
+
+local statusCorner = Instance.new("UICorner")
+statusCorner.CornerRadius = UDim.new(0, 8)
+statusCorner.Parent = statusBar
+
+local statusText = Instance.new("TextLabel")
+statusText.Size = UDim2.new(1, -10, 1, 0)
+statusText.Position = UDim2.new(0, 5, 0, 0)
+statusText.BackgroundTransparency = 1
+statusText.Text = "Статус: Защита выключена | Инвиз выключен"
+statusText.TextColor3 = Color3.fromRGB(200, 200, 200)
+statusText.TextSize = 11
+statusText.Font = Enum.Font.Gotham
+statusText.TextXAlignment = Enum.TextXAlignment.Left
+statusText.Parent = statusBar
+
+-- ============ ФУНКЦИИ ============
+
+-- Обновление статуса
+local function updateStatus()
+    local status = ""
+    if hitboxProtection then status = status .. "🛡️ Защита ВКЛ | " else status = status .. "Защита ВЫКЛ | " end
+    if invisibilityEnabled then status = status .. "👻 Инвиз ВКЛ" else status = status .. "Инвиз ВЫКЛ" end
+    statusText.Text = "Статус: " .. status
+end
+
+-- ЗАЩИТА ХИТБОКСОВ
+local function enableHitboxProtection()
+    if hitboxProtection then return end
+    hitboxProtection = true
+    
+    local function protectCharacter(character)
+        for _, part in pairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                pcall(function()
+                    part.CanCollide = false
+                    part.CanQuery = false
+                    part.CanTouch = false
+                end)
+            end
+        end
+        
+        local humanoid = character:FindFirstChild("Humanoid")
+        if humanoid then
+            pcall(function()
+                humanoid.BreakJointsOnDeath = false
+                humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, false)
+                humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+            end)
+        end
+    end
+    
+    local char = LocalPlayer.Character
+    if char then
+        protectCharacter(char)
+    end
+    
+    if characterConnection then characterConnection:Disconnect() end
+    characterConnection = LocalPlayer.CharacterAdded:Connect(function(character)
+        character:WaitForChild("HumanoidRootPart")
+        task.wait(0.1)
+        if hitboxProtection then
+            protectCharacter(character)
+        end
+    end)
+    
+    protectBtn.BackgroundColor3 = Color3.fromRGB(100, 60, 60)
+    updateStatus()
+end
+
+local function disableHitboxProtection()
+    hitboxProtection = false
+    
+    local char = LocalPlayer.Character
+    if char then
+        for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                pcall(function()
+                    part.CanCollide = true
+                    part.CanQuery = true
+                    part.CanTouch = true
+                end)
+            end
+        end
+        
+        local humanoid = char:FindFirstChild("Humanoid")
+        if humanoid then
+            pcall(function()
+                humanoid.BreakJointsOnDeath = true
+                humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, true)
+                humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
+            end)
+        end
+    end
+    
+    protectBtn.BackgroundColor3 = Color3.fromRGB(80, 50, 50)
+    updateStatus()
+end
+
+-- ИНВИЗ
+local function enableInvisibility()
+    if invisibilityEnabled then return end
+    invisibilityEnabled = true
+    
+    local char = LocalPlayer.Character
+    if char then
+        for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                originalTransparencies[part] = part.Transparency
+                part.Transparency = 1
+            end
+        end
+    end
+    
+    invisBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 100)
+    updateStatus()
+end
+
+local function disableInvisibility()
+    invisibilityEnabled = false
+    
+    local char = LocalPlayer.Character
+    if char then
+        for part, origTrans in pairs(originalTransparencies) do
+            if part and part.Parent then
+                part.Transparency = origTrans
+            end
+        end
+    end
+    originalTransparencies = {}
+    
+    invisBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 80)
+    updateStatus()
+end
+
+-- ПОЛЁТ
+local function enableFly()
+    if flying then return end
+    flying = true
+    
+    local char = LocalPlayer.Character
+    if not char then return end
+    
+    local humanoid = char:FindFirstChild("Humanoid")
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    
+    if not humanoid or not hrp then return end
+    
+    originalSpeed = humanoid.WalkSpeed
+    humanoid.PlatformStand = true
+    
+    bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+    bodyVelocity.Parent = hrp
+    
+    flyConnection = RunService.RenderStepped:Connect(function()
+        if not flying or not char or not char.Parent then return end
+        
+        local camera = workspace.CurrentCamera
+        local moveDir = Vector3.new(0, 0, 0)
+        
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            moveDir = moveDir + camera.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+            moveDir = moveDir - camera.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+            moveDir = moveDir + camera.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+            moveDir = moveDir - camera.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            moveDir = moveDir + Vector3.new(0, 1, 0)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+            moveDir = moveDir - Vector3.new(0, 1, 0)
+        end
+        
+        if moveDir.Magnitude > 0 then
+            moveDir = moveDir.Unit * flySpeed
+        end
+        
+        if bodyVelocity then
+            bodyVelocity.Velocity = moveDir
+        end
+    end)
+    
+    flyBtn.BackgroundColor3 = Color3.fromRGB(60, 100, 60)
+end
+
+local function disableFly()
+    if not flying then return end
+    flying = false
+    
+    local char = LocalPlayer.Character
+    if char then
+        local humanoid = char:FindFirstChild("Humanoid")
+        if humanoid then
+            humanoid.PlatformStand = false
+            humanoid.WalkSpeed = originalSpeed
+        end
+    end
+    
+    if bodyVelocity then
+        bodyVelocity:Destroy()
+        bodyVelocity = nil
+    end
+    
+    if flyConnection then
+        flyConnection:Disconnect()
+        flyConnection = nil
+    end
+    
+    flyBtn.BackgroundColor3 = Color3.fromRGB(50, 80, 50)
+end
+
+-- NOCLIP
+local function enableNoclip()
+    if noclipEnabled then return end
+    noclipEnabled = true
+    
+    local function applyNoclip(character)
+        for _, part in pairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end
+    
+    local char = LocalPlayer.Character
+    if char then
+        applyNoclip(char)
+    end
+    
+    LocalPlayer.CharacterAdded:Connect(function(character)
+        character:WaitForChild("HumanoidRootPart")
+        if noclipEnabled then
+            applyNoclip(character)
+        end
+    end)
+    
+    noclipBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 60)
+end
+
+local function disableNoclip()
+    noclipEnabled = false
+    
+    local char = LocalPlayer.Character
+    if char then
+        for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = true
+            end
+        end
+    end
+    
+    noclipBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 50)
+end
+
+-- ============ НАЗНАЧЕНИЕ КНОПОК ============
+
+protectBtn.MouseButton1Click:Connect(function()
+    if hitboxProtection then
+        disableHitboxProtection()
+    else
+        enableHitboxProtection()
+    end
+end)
+
+invisBtn.MouseButton1Click:Connect(function()
+    if invisibilityEnabled then
+        disableInvisibility()
+    else
+        enableInvisibility()
+    end
+end)
+
+flyBtn.MouseButton1Click:Connect(function()
+    if flying then
+        disableFly()
+    else
+        enableFly()
+    end
+end)
+
+noclipBtn.MouseButton1Click:Connect(function()
+    if noclipEnabled then
+        disableNoclip()
+    else
+        enableNoclip()
+    end
+end)
+
+-- ============ ГОРЯЧИЕ КЛАВИШИ ============
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if input.KeyCode == Enum.KeyCode.F5 then
+        mainFrame.Visible = not mainFrame.Visible
+    elseif input.KeyCode == Enum.KeyCode.F6 then
+        if hitboxProtection then
+            disableHitboxProtection()
+        else
+            enableHitboxProtection()
+        end
+    elseif input.KeyCode == Enum.KeyCode.F7 then
+        if invisibilityEnabled then
+            disableInvisibility()
+        else
+            enableInvisibility()
+        end
+    elseif input.KeyCode == Enum.KeyCode.F8 then
+        if flying then
+            disableFly()
+        else
+            enableFly()
+        end
+    end
+end)
+
+-- ============ ЗАКРЫТИЕ (ИСПРАВЛЕНО) ============
+local function closeGui()
+    -- Отключаем всё
+    pcall(function()
+        if flying then disableFly() end
+        if noclipEnabled then disableNoclip() end
+        if hitboxProtection then disableHitboxProtection() end
+        if invisibilityEnabled then disableInvisibility() end
+        if characterConnection then characterConnection:Disconnect() end
+        if flyConnection then flyConnection:Disconnect() end
+    end)
+    
+    -- Удаляем GUI
+    task.spawn(function()
+        task.wait(0.05)
+        pcall(function()
+            if screenGui and screenGui.Parent then
+                screenGui:Destroy()
+            end
+        end)
+    end)
+end
+
+closeButton.MouseButton1Click:Connect(closeGui)
+minButton.MouseButton1Click:Connect(function()
+    mainFrame.Visible = false
+end)
+
+-- Минификация при нажатии на заголовок
+titleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 and input.Position.Y - titleBar.AbsolutePosition.Y < 50 then
+        -- Драг реализован через Draggable свойство
+    end
+end)
+
+print("✅ DELTA PROTECT v5.1 загружен! Нажми F5 чтобы скрыть GUI")
