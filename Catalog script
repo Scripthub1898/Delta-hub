@@ -1,0 +1,159 @@
+-- Скрипт каталога одежды (Client Script в StarterGui)
+
+local player = game.Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+
+-- НАСТРОЙКИ КАТАЛОГА (замените на свои ID вещей)
+local catalogItems = {
+    {id = 123456789, name = "Красная футболка", type = "Shirt"},  -- ID футболки
+    {id = 987654321, name = "Джинсы", type = "Pants"},              -- ID штанов
+    {id = 555555555, name = "Шляпа", type = "Hat"},                 -- ID аксессуара
+    {id = 111111111, name = "Синяя футболка", type = "Shirt"},
+    {id = 222222222, name = "Шорты", type = "Pants"},
+    -- Добавьте больше вещей по аналогии
+}
+
+-- ТИПЫ ВЕЩЕЙ:
+-- "Shirt" - футболка (надевается на верх)
+-- "Pants" - штаны (надевается на низ)
+-- "Hat" - шляпа / аксессуар на голову (надевается на Character)
+
+local itemsPerPage = 6  -- сколько вещей показывать на одной странице
+local currentPage = 1
+
+-- Находим GUI элементы
+local gui = script.Parent
+local container = gui:WaitForChild("ItemsContainer")
+local prevBtn = gui:WaitForChild("PrevPage")
+local nextBtn = gui:WaitForChild("NextPage")
+local pageText = gui:WaitForChild("PageNumber")
+
+-- Функция для создания кнопки вещи
+local function createItemButton(item, index)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(0, 200, 0, 60)
+    button.Position = UDim2.new(0, 10 + ((index-1) % 3) * 210, 0, 10 + math.floor((index-1)/3) * 70)
+    button.Text = item.name .. "\n[" .. item.type .. "]"
+    button.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.BorderSizePixel = 0
+    button.Font = Enum.Font.GothamBold
+    button.TextSize = 14
+    
+    -- Надевание вещи при клике
+    button.MouseButton1Click:Connect(function()
+        pcall(function()
+            if item.type == "Shirt" then
+                -- Снимаем старую футболку, если есть
+                local oldShirt = character:FindFirstChild("Shirt")
+                if oldShirt then oldShirt:Destroy() end
+                
+                -- Создаём новую футболку
+                local shirt = Instance.new("Shirt")
+                shirt.ShirtTemplate = "rbxassetid://" .. item.id
+                shirt.Parent = character
+                
+            elseif item.type == "Pants" then
+                local oldPants = character:FindFirstChild("Pants")
+                if oldPants then oldPants:Destroy() end
+                
+                local pants = Instance.new("Pants")
+                pants.PantsTemplate = "rbxassetid://" .. item.id
+                pants.Parent = character
+                
+            elseif item.type == "Hat" then
+                -- Надеваем аксессуар на голову (если его нет)
+                local accessory = Instance.new("Accessory")
+                accessory.Name = "Hat_" .. item.id
+                accessory.AccessoryType = Enum.AccessoryType.Hat
+                
+                -- Создаём Handle (модель аксессуара)
+                local handle = Instance.new("Part")
+                handle.Name = "Handle"
+                handle.Size = Vector3.new(1, 1, 1)
+                handle.Transparency = 1
+                handle.Anchored = false
+                handle.CanCollide = false
+                
+                -- Привязываем к голове
+                local attachment = Instance.new("Attachment")
+                attachment.Parent = handle
+                
+                accessory.Handle = handle
+                accessory.AttachmentPoint = attachment
+                accessory.Parent = character
+                
+                -- Загружаем MeshId
+                local meshId = "rbxassetid://" .. item.id
+                -- Примечание: для корректной работы аксессуара нужен SpecialMesh
+                local mesh = Instance.new("SpecialMesh")
+                mesh.MeshId = meshId
+                mesh.Parent = handle
+            end
+            
+            print("Надето: " .. item.name)
+            
+            -- Небольшой визуальный эффект (мигание кнопки)
+            local originalColor = button.BackgroundColor3
+            button.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
+            wait(0.1)
+            button.BackgroundColor3 = originalColor
+        end)
+    end)
+    
+    return button
+end
+
+-- Функция для отображения текущей страницы
+local function refreshPage()
+    -- Очищаем контейнер
+    for _, child in ipairs(container:GetChildren()) do
+        if child:IsA("TextButton") then
+            child:Destroy()
+        end
+    end
+    
+    -- Вычисляем какие вещи показывать
+    local startIndex = (currentPage - 1) * itemsPerPage + 1
+    local endIndex = math.min(startIndex + itemsPerPage - 1, #catalogItems)
+    
+    for i = startIndex, endIndex do
+        local item = catalogItems[i]
+        local button = createItemButton(item, i - startIndex + 1)
+        button.Parent = container
+    end
+    
+    -- Обновляем текст страницы
+    local totalPages = math.ceil(#catalogItems / itemsPerPage)
+    pageText.Text = "Страница " .. currentPage .. " из " .. totalPages
+    
+    -- Блокируем кнопки при необходимости
+    prevBtn.Visible = (currentPage > 1)
+    nextBtn.Visible = (currentPage < totalPages)
+end
+
+-- Кнопки навигации
+prevBtn.MouseButton1Click:Connect(function()
+    if currentPage > 1 then
+        currentPage = currentPage - 1
+        refreshPage()
+    end
+end)
+
+nextBtn.MouseButton1Click:Connect(function()
+    local totalPages = math.ceil(#catalogItems / itemsPerPage)
+    if currentPage < totalPages then
+        currentPage = currentPage + 1
+        refreshPage()
+    end
+end)
+
+-- Обновляем при появлении персонажа
+player.CharacterAdded:Connect(function(newCharacter)
+    character = newCharacter
+    humanoid = character:WaitForChild("Humanoid")
+end)
+
+-- Первоначальная загрузка
+refreshPage()
