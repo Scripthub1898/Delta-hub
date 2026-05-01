@@ -1,360 +1,353 @@
 --[[
-    ПОЛНЫЙ ИНВИЗ + ГОЛОГРАММА для Delta Executor
-    - Ты видишь себя как полупрозрачную голограмму
+    FIXED: ПОЛНЫЙ ИНВИЗ + ГОЛОГРАММА для Delta Executor
+    - Камера остается на голограмме (на тебе)
+    - Управление работает нормально
+    - Тело улетает за карту, но оно не мешает
     - Другие игроки тебя НЕ ВИДЯТ
-    - Тело улетает за карту
-    - Предметы остаются на тебе (голограмме)
 --]]
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local LocalPlayer = Players.LocalPlayer
 local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
 
 -- НАСТРОЙКИ
 local Settings = {
-    Mode = "Normal", -- "Normal" или "Auto"
+    Mode = "Normal",
     IsActive = false,
-    RealBodyPosition = nil
+    OriginalCameraCFrame = nil,
+    FakeCharacter = nil,
+    RealBody = nil
 }
 
--- ПОЗИЦИЯ ЗА КАРТОЙ (очень далеко)
+-- ПОЗИЦИЯ ЗА КАРТОЙ
 local FAR_POSITION = Vector3.new(100000, 100000, 100000)
 
--- СОЗДАНИЕ GUI
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "FullInvizGUI"
-ScreenGui.Parent = game:GetService("CoreGui")
-
-local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 300, 0, 420)
-MainFrame.Position = UDim2.new(0.5, -150, 0.5, -210)
-MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
-MainFrame.BackgroundTransparency = 0.1
-MainFrame.BorderSizePixel = 0
-MainFrame.Active = true
-MainFrame.Draggable = true
-MainFrame.Parent = ScreenGui
-
--- Заголовок
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 35)
-Title.BackgroundColor3 = Color3.fromRGB(150, 0, 255)
-Title.Text = "👻 FULL INVIZ HOLOGRAM 👻"
-Title.TextColor3 = Color3.new(1, 1, 1)
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 16
-Title.Parent = MainFrame
-
--- Кнопка активации
-local ActivateBtn = Instance.new("TextButton")
-ActivateBtn.Size = UDim2.new(0, 260, 0, 45)
-ActivateBtn.Position = UDim2.new(0.5, -130, 0, 50)
-ActivateBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 120)
-ActivateBtn.Text = "🌀 АКТИВИРОВАТЬ ИНВИЗ"
-ActivateBtn.TextColor3 = Color3.new(1, 1, 1)
-ActivateBtn.Font = Enum.Font.GothamBold
-ActivateBtn.TextSize = 14
-ActivateBtn.Parent = MainFrame
-
--- Режим
-local ModeLabel = Instance.new("TextLabel")
-ModeLabel.Size = UDim2.new(0, 260, 0, 30)
-ModeLabel.Position = UDim2.new(0.5, -130, 0, 105)
-ModeLabel.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-ModeLabel.Text = "РЕЖИМ: ОБЫЧНЫЙ (до смерти)"
-ModeLabel.TextColor3 = Color3.new(1, 1, 1)
-ModeLabel.Font = Enum.Font.Gotham
-ModeLabel.TextSize = 12
-ModeLabel.Parent = MainFrame
-
--- Кнопка смены режима
-local ModeBtn = Instance.new("TextButton")
-ModeBtn.Size = UDim2.new(0, 260, 0, 35)
-ModeBtn.Position = UDim2.new(0.5, -130, 0, 145)
-ModeBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
-ModeBtn.Text = "🔄 СМЕНИТЬ РЕЖИМ"
-ModeBtn.TextColor3 = Color3.new(1, 1, 1)
-ModeBtn.Font = Enum.Font.Gotham
-ModeBtn.TextSize = 13
-ModeBtn.Parent = MainFrame
-
--- Кнопка телепорта тела обратно
-local TeleportBodyBtn = Instance.new("TextButton")
-TeleportBodyBtn.Size = UDim2.new(0, 260, 0, 35)
-TeleportBodyBtn.Position = UDim2.new(0.5, -130, 0, 195)
-TeleportBodyBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 110)
-TeleportBodyBtn.Text = "📍 ВЕРНУТЬ ТЕЛО (СПАВН)"
-TeleportBodyBtn.TextColor3 = Color3.new(1, 1, 1)
-TeleportBodyBtn.Font = Enum.Font.Gotham
-TeleportBodyBtn.TextSize = 13
-TeleportBodyBtn.Parent = MainFrame
-
--- Статус
-local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Size = UDim2.new(0, 280, 0, 80)
-StatusLabel.Position = UDim2.new(0.5, -140, 0, 245)
-StatusLabel.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
-StatusLabel.Text = "Статус: ОЖИДАНИЕ\nИнвиз: ❌ ВЫКЛ\nВидимость для других: НЕВИДИМ\nТы: голограмма"
-StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-StatusLabel.Font = Enum.Font.Gotham
-StatusLabel.TextSize = 11
-StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
-StatusLabel.Parent = MainFrame
-
--- Хоткеи
-local HotkeyHint = Instance.new("TextLabel")
-HotkeyHint.Size = UDim2.new(0, 280, 0, 40)
-HotkeyHint.Position = UDim2.new(0.5, -140, 0, 335)
-HotkeyHint.BackgroundTransparency = 1
-HotkeyHint.Text = "Хоткеи:\n[ Z ] - Вкл/Выкл инвиз\n[ X ] - Телепорт тела на спавн"
-HotkeyHint.TextColor3 = Color3.fromRGB(150, 150, 150)
-HotkeyHint.Font = Enum.Font.Gotham
-HotkeyHint.TextSize = 10
-HotkeyHint.TextXAlignment = Enum.TextXAlignment.Left
-HotkeyHint.Parent = MainFrame
-
--- ФУНКЦИЯ: Сделать персонажа НЕВИДИМЫМ ДЛЯ ДРУГИХ
-local function MakeInvisibleForOthers(character, isInvisible)
-    if not character then return end
+-- СОЗДАНИЕ КЛОНА-ГОЛОГРАММЫ (для управления)
+local function CreateHologramClone(originalChar)
+    local clone = originalChar:Clone()
+    clone.Name = "HologramClone"
+    clone.Parent = Workspace
     
-    for _, descendant in pairs(character:GetDescendants()) do
-        if descendant:IsA("BasePart") or descendant:IsA("MeshPart") then
-            if isInvisible then
-                -- Делаем невидимым для других через LocalTransparencyModifier
-                descendant.LocalTransparencyModifier = 1
-            else
-                descendant.LocalTransparencyModifier = 0
-            end
-        end
-    end
-    
-    -- Если это не локальный игрок, скрываем полностью
-    if character ~= LocalPlayer.Character then
-        for _, descendant in pairs(character:GetDescendants()) do
-            if descendant:IsA("BasePart") then
-                descendant.Transparency = isInvisible and 1 or 0
-            end
-        end
-    end
-end
-
--- ФУНКЦИЯ: Сделать ТЕБЯ голограммой (видишь себя полупрозрачным)
-local function MakeSelfHologram(character, isHologram)
-    if not character or character ~= LocalPlayer.Character then return end
-    
-    for _, part in pairs(character:GetDescendants()) do
+    -- Делаем клон полупрозрачным
+    for _, part in pairs(clone:GetDescendants()) do
         if part:IsA("BasePart") or part:IsA("MeshPart") then
-            if isHologram then
-                -- Ты видишь себя как голограмму (полупрозрачную)
-                part.Transparency = 0.5
-                -- Эффект свечения
-                local glow = part:FindFirstChild("HologramGlow")
-                if not glow and part:IsA("BasePart") then
-                    local newGlow = Instance.new("SelectionBox")
-                    newGlow.Name = "HologramGlow"
-                    newGlow.Color3 = Color3.fromRGB(0, 200, 255)
-                    newGlow.LineThickness = 0.05
-                    newGlow.Transparency = 0.7
-                    newGlow.Adornee = part
-                    newGlow.Parent = part
-                end
-            else
-                part.Transparency = 0
-                local glow = part:FindFirstChild("HologramGlow")
-                if glow then glow:Destroy() end
-            end
+            part.Transparency = 0.4
+            part.Material = Enum.Material.Neon
+            part.CanCollide = false
+            
+            -- Добавляем свечение
+            local glow = Instance.new("SelectionBox")
+            glow.Name = "GlowEffect"
+            glow.Color3 = Color3.fromRGB(0, 200, 255)
+            glow.LineThickness = 0.1
+            glow.Transparency = 0.5
+            glow.Adornee = part
+            glow.Parent = part
         end
     end
-end
-
--- ФУНКЦИЯ: Отправить реальное тело за карту
-local function SendBodyFarAway(character)
-    if not character then return end
     
-    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-    if humanoidRootPart then
-        -- Сохраняем оригинальную позицию
-        Settings.RealBodyPosition = humanoidRootPart.Position
-        
-        -- Телепортируем тело ДАЛЕКО за карту
-        humanoidRootPart.CFrame = CFrame.new(FAR_POSITION)
-        
-        -- Замораживаем тело, чтобы оно не падало
-        humanoidRootPart.Anchored = true
-        
-        -- Отключаем управление старым телом
-        local humanoid = character:FindFirstChild("Humanoid")
-        if humanoid then
-            humanoid.PlatformStand = true
+    -- Отключаем скрипты в клоне
+    for _, script in pairs(clone:GetDescendants()) do
+        if script:IsA("Script") or script:IsA("LocalScript") then
+            script:Destroy()
         end
-        
-        -- Делаем тело полностью невидимым для всех
-        for _, part in pairs(character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.Transparency = 1
-                part.CanCollide = false
-            end
+    end
+    
+    return clone
+end
+
+-- ФУНКЦИЯ: Блокировка управления реальным телом
+local function DisableRealBody(character)
+    local humanoid = character:FindFirstChild("Humanoid")
+    if humanoid then
+        humanoid.PlatformStand = true
+        humanoid.AutoRotate = false
+    end
+    
+    -- Замораживаем все части
+    for _, part in pairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.Anchored = true
+            part.CanCollide = false
         end
     end
 end
 
--- ФУНКЦИЯ: Вернуть тело на место
+-- ФУНКЦИЯ: Привязка камеры к голограмме
+local function AttachCameraToClone(clone)
+    local camera = Workspace.CurrentCamera
+    if not camera then return end
+    
+    -- Сохраняем настройки камеры
+    camera.CameraType = Enum.CameraType.Custom
+    
+    -- Привязываем камеру к голове клона
+    local head = clone:FindFirstChild("Head")
+    if head then
+        camera.CameraSubject = head
+    else
+        local humanoid = clone:FindFirstChild("Humanoid")
+        if humanoid then
+            camera.CameraSubject = humanoid
+        end
+    end
+end
+
+-- ОТПРАВКА ТЕЛА ЗА КАРТУ
+local function SendBodyFarAway(character)
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    if not humanoidRootPart then return end
+    
+    Settings.RealBody = character
+    
+    -- Отправляем тело далеко
+    humanoidRootPart.CFrame = CFrame.new(FAR_POSITION)
+    
+    -- Блокируем управление реальным телом
+    DisableRealBody(character)
+    
+    -- Делаем тело полностью невидимым
+    for _, part in pairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.Transparency = 1
+            part.LocalTransparencyModifier = 1
+        end
+    end
+end
+
+-- СОЗДАНИЕ ГОЛОГРАММЫ ДЛЯ УПРАВЛЕНИЯ
+local function CreateControllableHologram(originalChar)
+    -- Создаем клон для управления
+    local hologram = CreateHologramClone(originalChar)
+    
+    -- Копируем позицию
+    local hrp = originalChar:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        hologram:SetPrimaryPartCFrame(hrp.CFrame)
+    end
+    
+    -- Привязываем камеру к голограмме
+    AttachCameraToClone(hologram)
+    
+    -- Запускаем синхронизацию управления
+    task.spawn(function()
+        while Settings.IsActive and hologram and hologram.Parent do
+            task.wait()
+            
+            -- Синхронизируем движение голограммы с управлением игрока
+            local userInput = UserInputService:GetKeysPressed()
+            
+            -- Получаем направление движения от оригинального персонажа
+            local originalChar = LocalPlayer.Character
+            if originalChar and originalChar:FindFirstChild("Humanoid") then
+                local humanoid = originalChar.Humanoid
+                local moveDirection = humanoid.MoveDirection
+                
+                -- Перемещаем голограмму
+                local hologramHRP = hologram:FindFirstChild("HumanoidRootPart")
+                if hologramHRP and moveDirection.Magnitude > 0 then
+                    local speed = humanoid.WalkSpeed
+                    local newPos = hologramHRP.Position + (moveDirection * speed * task.wait())
+                    hologramHRP.CFrame = CFrame.new(newPos)
+                end
+            end
+        end
+    end)
+    
+    return hologram
+end
+
+-- УНИЧТОЖЕНИЕ ГОЛОГРАММЫ
+local function DestroyHologram()
+    if Settings.FakeCharacter and Settings.FakeCharacter.Parent then
+        Settings.FakeCharacter:Destroy()
+    end
+    Settings.FakeCharacter = nil
+end
+
+-- ВЕРНУТЬ ТЕЛО
 local function ReturnBody()
+    if not Settings.RealBody then return end
+    
     local character = LocalPlayer.Character
     if not character then return end
     
-    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-    if humanoidRootPart and Settings.RealBodyPosition then
-        humanoidRootPart.CFrame = CFrame.new(Settings.RealBodyPosition)
-        humanoidRootPart.Anchored = false
-        
-        local humanoid = character:FindFirstChild("Humanoid")
-        if humanoid then
-            humanoid.PlatformStand = false
-        end
-        
-        -- Возвращаем видимость
-        for _, part in pairs(character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.Transparency = 0
-                part.CanCollide = true
-            end
-        end
-        
-        StatusLabel.Text = "Статус: ТЕЛО ВЕРНУТО\nИнвиз: ❌ ВЫКЛ"
+    -- Возвращаем тело на спавн
+    local spawnLocation = Workspace:FindFirstChild("SpawnLocation")
+    local returnPos = spawnLocation and spawnLocation.Position or Vector3.new(0, 10, 0)
+    
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        hrp.CFrame = CFrame.new(returnPos)
+        hrp.Anchored = false
     end
+    
+    -- Восстанавливаем управление
+    local humanoid = character:FindFirstChild("Humanoid")
+    if humanoid then
+        humanoid.PlatformStand = false
+        humanoid.AutoRotate = true
+    end
+    
+    -- Возвращаем видимость
+    for _, part in pairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.Transparency = 0
+            part.LocalTransparencyModifier = 0
+            part.CanCollide = true
+        end
+    end
+    
+    -- Возвращаем камеру
+    local camera = Workspace.CurrentCamera
+    if camera then
+        camera.CameraSubject = humanoid
+        camera.CameraType = Enum.CameraType.Custom
+    end
+    
+    Settings.RealBody = nil
 end
 
--- ОСНОВНАЯ ФУНКЦИЯ АКТИВАЦИИ ИНВИЗА
+-- ОСНОВНАЯ ФУНКЦИЯ
 local function ToggleInvis()
     local character = LocalPlayer.Character
-    if not character then 
-        StatusLabel.Text = "Статус: ОШИБКА\nПерсонаж не найден!"
+    if not character then
+        print("❌ Персонаж не найден")
         return
     end
     
     Settings.IsActive = not Settings.IsActive
     
     if Settings.IsActive then
-        -- АКТИВАЦИЯ ИНВИЗА
+        -- АКТИВАЦИЯ
+        print("✅ Активация инвиза...")
+        
         -- 1. Отправляем тело за карту
         SendBodyFarAway(character)
         
-        -- 2. Делаем себя голограммой (видим полупрозрачным)
-        MakeSelfHologram(character, true)
+        -- 2. Создаем управляемую голограмму
+        local hologram = CreateControllableHologram(character)
+        Settings.FakeCharacter = hologram
         
-        -- 3. Скрываем себя от других игроков (глобально)
-        MakeInvisibleForOthers(character, true)
+        -- 3. Прячем оригинальное тело
+        for _, part in pairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.Transparency = 1
+                part.LocalTransparencyModifier = 1
+            end
+        end
         
-        -- 4. Создаем копию себя на месте (но это не нужно, т.к. ты уже голограмма)
-        
-        StatusLabel.Text = "Статус: ✅ ИНВИЗ АКТИВЕН\nИнвиз: ✅ ВКЛ\nВидимость для других: НЕВИДИМ\nТы: Голограмма\nТело: ЗА КАРТОЙ"
-        ActivateBtn.Text = "🌀 ДЕАКТИВИРОВАТЬ ИНВИЗ"
-        ActivateBtn.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
-        
-        -- Звуковой эффект
-        local sound = Instance.new("Sound")
-        sound.SoundId = "rbxassetid://9120386437" -- Звук телепортации
-        sound.Volume = 0.5
-        sound.Parent = character
-        sound:Play()
-        task.wait(0.5)
-        sound:Destroy()
+        print("✅ Голограмма создана! Камера привязана к голограмме")
         
     else
-        -- ДЕАКТИВАЦИЯ ИНВИЗА
+        -- ДЕАКТИВАЦИЯ
+        print("❌ Деактивация инвиза...")
+        
         -- 1. Возвращаем тело
         ReturnBody()
         
-        -- 2. Убираем голограмму с себя
-        MakeSelfHologram(character, false)
+        -- 2. Удаляем голограмму
+        DestroyHologram()
         
-        -- 3. Делаем себя видимым для других
-        MakeInvisibleForOthers(character, false)
-        
-        StatusLabel.Text = "Статус: ОЖИДАНИЕ\nИнвиз: ❌ ВЫКЛ\nВидимость для других: ВИДИМ\nТы: Нормальный"
-        ActivateBtn.Text = "🌀 АКТИВИРОВАТЬ ИНВИЗ"
-        ActivateBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 120)
+        print("✅ Инвиз деактивирован")
     end
 end
 
--- ТЕЛЕПОРТ ТЕЛА НА СПАВН (для авто-режима)
-local function TeleportToSpawn()
-    if not Settings.IsActive then
-        StatusLabel.Text = "Статус: СНАЧАЛА АКТИВИРУЙ ИНВИЗ"
-        return
-    end
-    
-    local character = LocalPlayer.Character
-    if character then
-        local spawnLocation = Workspace:FindFirstChild("SpawnLocation")
-        if spawnLocation then
-            local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-            if humanoidRootPart then
-                humanoidRootPart.CFrame = spawnLocation.CFrame
-                StatusLabel.Text = "Статус: ТЕЛО ТЕЛЕПОРТИРОВАНО НА СПАВН"
-            end
-        else
-            StatusLabel.Text = "Статус: СПАВН НЕ НАЙДЕН"
-        end
+-- GUI (упрощенный, без лишних элементов)
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "InvizGUI"
+ScreenGui.Parent = game:GetService("CoreGui")
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 250, 0, 200)
+Frame.Position = UDim2.new(0.5, -125, 0.5, -100)
+Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
+Frame.BackgroundTransparency = 0.1
+Frame.Parent = ScreenGui
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundColor3 = Color3.fromRGB(100, 0, 200)
+Title.Text = "👻 ИНВИЗ v3.0"
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 18
+Title.Parent = Frame
+
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0, 200, 0, 40)
+ToggleBtn.Position = UDim2.new(0.5, -100, 0, 50)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 100)
+ToggleBtn.Text = "🔮 ВКЛ/ВЫКЛ (Z)"
+ToggleBtn.TextColor3 = Color3.new(1, 1, 1)
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.TextSize = 14
+ToggleBtn.Parent = Frame
+
+local StatusText = Instance.new("TextLabel")
+StatusText.Size = UDim2.new(0, 230, 0, 50)
+StatusText.Position = UDim2.new(0.5, -115, 0, 105)
+StatusText.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+StatusText.Text = "Статус: ❌ ВЫКЛ\nКамера на голограмме"
+StatusText.TextColor3 = Color3.new(1, 1, 1)
+StatusText.Font = Enum.Font.Gotham
+StatusText.TextSize = 11
+StatusText.Parent = Frame
+
+local HotkeyLabel = Instance.new("TextLabel")
+HotkeyLabel.Size = UDim2.new(0, 230, 0, 30)
+HotkeyLabel.Position = UDim2.new(0.5, -115, 0, 160)
+HotkeyLabel.BackgroundTransparency = 1
+HotkeyLabel.Text = "Хоткей: Z - Инвиз"
+HotkeyLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+HotkeyLabel.Font = Enum.Font.Gotham
+HotkeyLabel.TextSize = 11
+HotkeyLabel.Parent = Frame
+
+-- ОБНОВЛЕНИЕ СТАТУСА
+local function UpdateStatus()
+    if Settings.IsActive then
+        StatusText.Text = "Статус: ✅ АКТИВЕН\nКамера на голограмме\nРежим: " .. Settings.Mode
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
+        ToggleBtn.Text = "🔮 ДЕАКТИВИРОВАТЬ (Z)"
+    else
+        StatusText.Text = "Статус: ❌ ВЫКЛ\nКамера на теле\nРежим: " .. Settings.Mode
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 100)
+        ToggleBtn.Text = "🔮 АКТИВИРОВАТЬ (Z)"
     end
 end
-
--- ОБРАБОТКА СМЕРТИ ПЕРСОНАЖА
-LocalPlayer.CharacterAdded:Connect(function(character)
-    task.wait(1) -- Ждем появления
-    
-    if Settings.Mode == "Auto" and Settings.IsActive then
-        -- В авто-режиме АВТОМАТИЧЕСКИ активируем инвиз после смерти
-        task.wait(0.5)
-        ToggleInvis()
-    elseif Settings.Mode == "Normal" then
-        -- В обычном режиме выключаем инвиз
-        if Settings.IsActive then
-            Settings.IsActive = false
-            StatusLabel.Text = "Статус: ИНВИЗ СБРОШЕН (СМЕРТЬ)\nРежим: Обычный"
-            ActivateBtn.Text = "🌀 АКТИВИРОВАТЬ ИНВИЗ"
-            ActivateBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 120)
-        end
-    end
-end)
-
--- ХОТКЕИ
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    
-    -- Кнопка Z - вкл/выкл инвиз
-    if input.KeyCode == Enum.KeyCode.Z then
-        ToggleInvis()
-    end
-    
-    -- Кнопка X - телепорт тела на спавн
-    if input.KeyCode == Enum.KeyCode.X then
-        TeleportToSpawn()
-    end
-end)
 
 -- КНОПКИ GUI
-ActivateBtn.MouseButton1Click:Connect(ToggleInvis)
+ToggleBtn.MouseButton1Click:Connect(function()
+    ToggleInvis()
+    UpdateStatus()
+end)
 
-ModeBtn.MouseButton1Click:Connect(function()
-    if Settings.Mode == "Normal" then
-        Settings.Mode = "Auto"
-        ModeLabel.Text = "РЕЖИМ: АВТО (инвиз после смерти)"
-        ModeLabel.BackgroundColor3 = Color3.fromRGB(70, 50, 70)
-        StatusLabel.Text = StatusLabel.Text:gsub("Режим: Обычный", "Режим: АВТО")
-    else
-        Settings.Mode = "Normal"
-        ModeLabel.Text = "РЕЖИМ: ОБЫЧНЫЙ (до смерти)"
-        ModeLabel.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-        StatusLabel.Text = StatusLabel.Text:gsub("Режим: АВТО", "Режим: Обычный")
+-- ХОТКЕЙ
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.Z then
+        ToggleInvis()
+        UpdateStatus()
     end
 end)
 
-TeleportBodyBtn.MouseButton1Click:Connect(TeleportToSpawn)
+-- ОБРАБОТКА СМЕРТИ
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(1)
+    if Settings.IsActive and Settings.Mode == "Auto" then
+        task.wait(0.5)
+        ToggleInvis()
+        UpdateStatus()
+    elseif Settings.Mode == "Normal" then
+        Settings.IsActive = false
+        UpdateStatus()
+    end
+end)
 
-print("✅ FULL INVIZ HOLOGRAM загружен!")
-print("📌 Нажми Z чтобы стать невидимым для других (ты видишь себя как голограмму)")
-print("📌 Твое тело улетит за карту, а ты останешься на месте как призрак")
+print("✅ ИНВИЗ СКРИПТ ЗАГРУЖЕН!")
+print("📌 Нажми Z для активации")
+print("📌 Камера останется на голограмме")
+print("📌 Ты сможешь нормально двигаться")
