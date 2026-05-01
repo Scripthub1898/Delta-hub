@@ -1,237 +1,359 @@
--- Deobfuscated with MoonSec V3 Deobfuscator Tool
--- Modified: Added auto-invis button that persists after death
+-- INVIS SYSTEM v2
+-- Ты = полупрозрачный клон (видишь только себя)
+-- Оригинальное тело далеко за картой (невидимо, неуязвимо)
+-- Камера и управление привязаны к клону
+-- При выключении инвиза: тело телепортируется к клону
 
-local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
 
--- Main configuration
+local player = Players.LocalPlayer
+local camera = Workspace.CurrentCamera
+
+-- ========== ПЕРЕМЕННЫЕ ==========
+local isInvisible = false
+local cloneCharacter = nil
+local originalCharacter = nil
+local flyEnabled = false
+local moveDirection = Vector3.new(0, 0, 0)
+local bodyVelocity = nil
+local bodyGyro = nil
+local originalHumanoid = nil
+
+-- ========== НАСТРОЙКИ ==========
 local CONFIG = {
-    speed = 21,
-    jumpPower = 74,
-    maxHealth = 185,
-    respawnTime = 11,
-    debugMode = false
+    hideDistance = 1000,              -- Как далеко прятать ориг тело
+    flySpeed = 120,                   -- Скорость полёта клона
+    cloneTransparency = 0.3,          -- Прозрачность клона (0.3 = полупрозрачный)
+    cloneColor = Color3.fromRGB(0, 200, 255), -- Цвет свечения
+    toggleKey = Enum.KeyCode.V        -- Клавиша вкл/выкл
 }
 
--- Invisibility settings
-local INVIS_CONFIG = {
-    enabled = false,  -- auto-invis state
-    normalInvis = false -- manual invis state
-}
+-- ========== СОХРАНЯЕМ ОРИГИНАЛЬНОГО ПЕРСОНАЖА ==========
+originalCharacter = player.Character or player.CharacterAdded:Wait()
+originalHumanoid = originalCharacter:WaitForChild("Humanoid")
 
--- Event connections
-local remotes = ReplicatedStorage:WaitForChild("Remotes")
-local damageEvent = remotes:WaitForChild("DamageEvent")
-local healEvent = remotes:WaitForChild("HealEvent")
-local respawnEvent = remotes:WaitForChild("RespawnEvent")
-
--- Weapon definitions extracted from obfuscated table
-local weapons = {
-    {
-        name = "Sword",
-        damage = 15,
-        cooldown = 0.8,
-        range = 4
-    },
-    {
-        name = "Bow",
-        damage = 10,
-        cooldown = 1.2,
-        range = 30
-    },
-    {
-        name = "Staff",
-        damage = 25,
-        cooldown = 2.5,
-        range = 15
-    }
-}
-
--- Invisibility function
-local function setInvisible(character, isInvisible)
-    if not character then return end
+-- ========== 1. СОЗДАНИЕ КЛОНА (ТЫ) ==========
+local function createClone()
+    if cloneCharacter then cloneCharacter:Destroy() end
     
-    for _, part in ipairs(character:GetDescendants()) do
+    -- Клонируем оригинального персонажа
+    cloneCharacter = originalCharacter:Clone()
+    cloneCharacter.Name = "PlayerClone_" .. player.Name
+    cloneCharacter.Parent = workspace
+    
+    -- Настройка внешнего вида (полупрозрачный, только для тебя)
+    for _, part in ipairs(cloneCharacter:GetDescendants()) do
         if part:IsA("BasePart") then
-            part.Transparency = isInvisible and 1 or 0
-        elseif part:IsA("Decal") then
-            part.Transparency = isInvisible and 1 or 0
-        end
-    end
-    
-    local humanoid = character:FindFirstChild("Humanoid")
-    if humanoid then
-        humanoid.HealthDisplayType = isInvisible and Enum.HumanoidHealthDisplayType.AlwaysOff or Enum.HumanoidHealthDisplayType.AlwaysOn
-    end
-end
-
--- Apply invisibility based on current state
-local function applyInvisibility(player)
-    local character = player.Character
-    if not character then return end
-    
-    if INVIS_CONFIG.normalInvis then
-        setInvisible(character, true)
-    elseif INVIS_CONFIG.enabled then
-        setInvisible(character, true)
-    else
-        setInvisible(character, false)
-    end
-end
-
--- Setup UI Button
-local function createUIButton()
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "InvisControl"
-    screenGui.Parent = game:GetService("CoreGui")
-    
-    local autoButton = Instance.new("TextButton")
-    autoButton.Name = "AutoInvisButton"
-    autoButton.Size = UDim2.new(0, 150, 0, 40)
-    autoButton.Position = UDim2.new(0, 10, 0, 10)
-    autoButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    autoButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    autoButton.Text = "Auto Invis: OFF"
-    autoButton.BorderSizePixel = 0
-    autoButton.Parent = screenGui
-    
-    local normalButton = Instance.new("TextButton")
-    normalButton.Name = "NormalInvisButton"
-    normalButton.Size = UDim2.new(0, 150, 0, 40)
-    normalButton.Position = UDim2.new(0, 10, 0, 55)
-    normalButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    normalButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    normalButton.Text = "Invis: OFF"
-    normalButton.BorderSizePixel = 0
-    normalButton.Parent = screenGui
-    
-    autoButton.MouseButton1Click:Connect(function()
-        INVIS_CONFIG.enabled = not INVIS_CONFIG.enabled
-        autoButton.Text = INVIS_CONFIG.enabled and "Auto Invis: ON" or "Auto Invis: OFF"
-        
-        if INVIS_CONFIG.enabled then
-            -- Turn off normal invis when enabling auto
-            INVIS_CONFIG.normalInvis = false
-            normalButton.Text = "Invis: OFF"
-        end
-        
-        applyInvisibility(Players.LocalPlayer)
-    end)
-    
-    normalButton.MouseButton1Click:Connect(function()
-        INVIS_CONFIG.normalInvis = not INVIS_CONFIG.normalInvis
-        normalButton.Text = INVIS_CONFIG.normalInvis and "Invis: ON" or "Invis: OFF"
-        
-        if INVIS_CONFIG.normalInvis then
-            -- Turn off auto invis when using manual mode
-            INVIS_CONFIG.enabled = false
-            autoButton.Text = "Auto Invis: OFF"
-        end
-        
-        applyInvisibility(Players.LocalPlayer)
-    end)
-    
-    return screenGui
-end
-
--- Utility functions
-local function calculateDamage(baseDamage, distance, player)
-    local character = player.Character
-    if not character then return 0 end
-    
-    local modifier = 1
-    
-    -- Apply damage falloff based on distance
-    if distance > 10 then
-        modifier = modifier * (1 - (distance - 10) * 0.02)
-    end
-    
-    -- Apply random variation
-    modifier = modifier * (math.random() * 0.2 + 0.9)
-    
-    return math.floor(baseDamage * modifier)
-end
-
--- Player handling
-local function setupPlayer(player)
-    local character = player.Character or player.CharacterAdded:Wait()
-    local humanoid = character:WaitForChild("Humanoid")
-    
-    humanoid.WalkSpeed = CONFIG.speed
-    humanoid.JumpPower = CONFIG.jumpPower
-    humanoid.MaxHealth = CONFIG.maxHealth
-    humanoid.Health = CONFIG.maxHealth
-    
-    -- Apply initial invisibility state
-    if player == Players.LocalPlayer then
-        applyInvisibility(player)
-    end
-    
-    -- Setup damage handling
-    damageEvent.OnServerEvent:Connect(function(playerWhoFired, targetPlayer, damageAmount, weaponIndex)
-        if playerWhoFired ~= player then return end
-        if not targetPlayer or not targetPlayer.Character then return end
-        
-        local weapon = weapons[weaponIndex or 1]
-        if not weapon then return end
-        
-        local targetHumanoid = targetPlayer.Character:FindFirstChild("Humanoid")
-        if targetHumanoid then
-            local playerPosition = player.Character.PrimaryPart.Position
-            local targetPosition = targetPlayer.Character.PrimaryPart.Position
-            local distance = (playerPosition - targetPosition).Magnitude
+            part.Transparency = CONFIG.cloneTransparency
+            part.CanCollide = true
+            part.Material = Enum.Material.Neon
             
-            if distance <= weapon.range then
-                local finalDamage = calculateDamage(damageAmount or weapon.damage, distance, targetPlayer)
-                targetHumanoid.Health = math.max(0, targetHumanoid.Health - finalDamage)
-                
-                -- Fire client effects
-                remotes.DamageEffect:FireClient(targetPlayer, finalDamage)
-            end
+            -- Добавляем свечение
+            local glow = Instance.new("PointLight")
+            glow.Parent = part
+            glow.Color = CONFIG.cloneColor
+            glow.Intensity = 0.5
+            glow.Range = 8
+        elseif part:IsA("Humanoid") then
+            part.NameDisplayDistance = 0  -- Без имени над головой
+            part.BreakJointsOnDeath = false
+            part.WalkSpeed = originalHumanoid.WalkSpeed
+            part.JumpPower = originalHumanoid.JumpPower
         end
-    end)
+    end
     
-    -- Handle respawn to reapply auto-invis
-    player.CharacterAdded:Connect(function(newCharacter)
-        task.wait(0.5) -- Wait for character to fully load
-        if player == Players.LocalPlayer then
-            applyInvisibility(player)
-        end
-    end)
+    -- Копируем позицию оригинального тела
+    local origRoot = originalCharacter:FindFirstChild("HumanoidRootPart")
+    local cloneRoot = cloneCharacter:FindFirstChild("HumanoidRootPart")
+    if origRoot and cloneRoot then
+        cloneRoot.CFrame = origRoot.CFrame
+    end
+    
+    return cloneCharacter
 end
 
--- Create UI for local player only
-if game:GetService("Players").LocalPlayer then
-    createUIButton()
+-- ========== 2. ПРИВЯЗКА КАМЕРЫ К КЛОНУ ==========
+local function attachCameraToClone()
+    if not cloneCharacter then return end
+    
+    local cloneRoot = cloneCharacter:FindFirstChild("HumanoidRootPart")
+    if cloneRoot then
+        camera.CameraSubject = cloneRoot
+        camera.CameraType = Enum.CameraType.Custom
+    end
 end
 
--- Initialize for existing players
-for _, player in ipairs(Players:GetPlayers()) do
-    setupPlayer(player)
-end
-
--- Setup for new players
-Players.PlayerAdded:Connect(setupPlayer)
-
--- Game loop
-RunService.Heartbeat:Connect(function(deltaTime)
-    for _, player in ipairs(Players:GetPlayers()) do
-        local character = player.Character
-        if character and character:FindFirstChild("Humanoid") then
-            local humanoid = character:FindFirstChild("Humanoid")
-            if humanoid.Health <= 0 then
-                if not character:FindFirstChild("Respawning") then
-                    local respawning = Instance.new("BoolValue")
-                    respawning.Name = "Respawning"
-                    respawning.Parent = character
-                    
-                    task.delay(CONFIG.respawnTime, function()
-                        respawnEvent:FireClient(player)
-                    end)
+-- ========== 3. ЭКИПИРОВКА ОРУЖИЯ В КЛОНА ==========
+local function equipWeaponsToClone()
+    if not cloneCharacter then return end
+    
+    -- Копируем всё оружие из инвентаря в клона
+    local backpack = player:FindFirstChild("Backpack")
+    if backpack then
+        for _, tool in ipairs(backpack:GetChildren()) do
+            if tool:IsA("Tool") then
+                local weaponClone = tool:Clone()
+                weaponClone.Parent = cloneCharacter
+                
+                -- Прикрепляем к руке клона
+                local rightHand = cloneCharacter:FindFirstChild("RightHand")
+                local handle = weaponClone:FindFirstChild("Handle")
+                
+                if rightHand and handle then
+                    local weld = Instance.new("Weld")
+                    weld.Part0 = rightHand
+                    weld.Part1 = handle
+                    weld.C0 = CFrame.new(0, -1, 0)
+                    weld.Parent = weaponClone
+                end
+                
+                -- Делаем оружие таким же полупрозрачным
+                for _, part in ipairs(weaponClone:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.Transparency = CONFIG.cloneTransparency
+                        part.Material = Enum.Material.Neon
+                    end
                 end
             end
         end
     end
+    
+    -- Копируем оружие из рук
+    local characterTools = originalCharacter:GetChildren()
+    for _, tool in ipairs(characterTools) do
+        if tool:IsA("Tool") then
+            local weaponClone = tool:Clone()
+            weaponClone.Parent = cloneCharacter
+            
+            local rightHand = cloneCharacter:FindFirstChild("RightHand")
+            local handle = weaponClone:FindFirstChild("Handle")
+            
+            if rightHand and handle then
+                local weld = Instance.new("Weld")
+                weld.Part0 = rightHand
+                weld.Part1 = handle
+                weld.C0 = CFrame.new(0, -1, 0)
+                weld.Parent = weaponClone
+            end
+        end
+    end
+end
+
+-- ========== 4. ПРЯЧЕМ ОРИГИНАЛЬНОЕ ТЕЛО (далеко за картой) ==========
+local function hideOriginalBody()
+    local origRoot = originalCharacter:FindFirstChild("HumanoidRootPart")
+    if not origRoot then return end
+    
+    -- Сохраняем позицию где стоял клон (на случай если понадобится)
+    local cloneRoot = cloneCharacter and cloneCharacter:FindFirstChild("HumanoidRootPart")
+    if cloneRoot then
+        -- Телепортируем ориг тело далеко за карту
+        local farAway = Vector3.new(CONFIG.hideDistance, CONFIG.hideDistance, CONFIG.hideDistance)
+        originalCharacter:SetPrimaryPartCFrame(CFrame.new(farAway))
+    end
+    
+    -- Делаем оригинальное тело полностью невидимым
+    for _, part in ipairs(originalCharacter:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.Transparency = 1
+            part.CanCollide = false
+        end
+    end
+    
+    -- Отключаем управление оригинальным телом
+    if originalHumanoid then
+        originalHumanoid.WalkSpeed = 0
+        originalHumanoid.JumpPower = 0
+        originalHumanoid.AutoRotate = false
+    end
+end
+
+-- ========== 5. СИСТЕМА ПОЛЁТА ДЛЯ КЛОНА ==========
+local function enableFlightForClone()
+    local cloneRoot = cloneCharacter:FindFirstChild("HumanoidRootPart")
+    if not cloneRoot then return end
+    
+    bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.MaxForce = Vector3.new(1e10, 1e10, 1e10)
+    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+    bodyVelocity.Parent = cloneRoot
+    
+    bodyGyro = Instance.new("BodyGyro")
+    bodyGyro.MaxTorque = Vector3.new(1e10, 1e10, 1e10)
+    bodyGyro.CFrame = cloneRoot.CFrame
+    bodyGyro.Parent = cloneRoot
+    
+    flyEnabled = true
+    
+    -- Управление от первого лица через камеру
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed or not flyEnabled or not isInvisible then return end
+        
+        local key = input.KeyCode
+        local camCF = camera.CFrame
+        
+        if key == Enum.KeyCode.W then
+            moveDirection = moveDirection + camCF.LookVector
+        elseif key == Enum.KeyCode.S then
+            moveDirection = moveDirection - camCF.LookVector
+        elseif key == Enum.KeyCode.A then
+            moveDirection = moveDirection - camCF.RightVector
+        elseif key == Enum.KeyCode.D then
+            moveDirection = moveDirection + camCF.RightVector
+        elseif key == Enum.KeyCode.Space then
+            moveDirection = moveDirection + Vector3.new(0, 1, 0)
+        elseif key == Enum.KeyCode.LeftControl then
+            moveDirection = moveDirection - Vector3.new(0, 1, 0)
+        end
+    end)
+    
+    UserInputService.InputEnded:Connect(function(input)
+        if not flyEnabled or not isInvisible then return end
+        
+        local key = input.KeyCode
+        local camCF = camera.CFrame
+        
+        if key == Enum.KeyCode.W then
+            moveDirection = moveDirection - camCF.LookVector
+        elseif key == Enum.KeyCode.S then
+            moveDirection = moveDirection + camCF.LookVector
+        elseif key == Enum.KeyCode.A then
+            moveDirection = moveDirection + camCF.RightVector
+        elseif key == Enum.KeyCode.D then
+            moveDirection = moveDirection - camCF.RightVector
+        elseif key == Enum.KeyCode.Space then
+            moveDirection = moveDirection - Vector3.new(0, 1, 0)
+        elseif key == Enum.KeyCode.LeftControl then
+            moveDirection = moveDirection + Vector3.new(0, 1, 0)
+        end
+    end)
+    
+    -- Обновление движения
+    RunService.RenderStepped:Connect(function()
+        if not flyEnabled or not isInvisible then return end
+        if not bodyVelocity or not bodyGyro then return end
+        
+        local direction = moveDirection
+        if direction.Magnitude > 0 then
+            direction = direction.Unit * CONFIG.flySpeed
+        else
+            direction = Vector3.new(0, 0, 0)
+        end
+        
+        bodyVelocity.Velocity = direction
+        bodyGyro.CFrame = camera.CFrame
+    end)
+end
+
+local function disableFlightForClone()
+    flyEnabled = false
+    if bodyVelocity then bodyVelocity:Destroy() end
+    if bodyGyro then bodyGyro:Destroy() end
+    bodyVelocity = nil
+    bodyGyro = nil
+    moveDirection = Vector3.new(0, 0, 0)
+end
+
+-- ========== 6. ВОЗВРАЩЕНИЕ (выключение инвиза) ==========
+local function returnToNormal()
+    if not cloneCharacter then return end
+    
+    disableFlightForClone()
+    
+    -- Получаем позицию клона
+    local cloneRoot = cloneCharacter:FindFirstChild("HumanoidRootPart")
+    if cloneRoot then
+        -- Телепортируем оригинальное тело к клону
+        originalCharacter:SetPrimaryPartCFrame(cloneRoot.CFrame)
+    end
+    
+    -- Делаем оригинальное тело снова видимым
+    for _, part in ipairs(originalCharacter:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.Transparency = 0
+            part.CanCollide = true
+        end
+    end
+    
+    -- Восстанавливаем управление
+    if originalHumanoid then
+        originalHumanoid.WalkSpeed = 16
+        originalHumanoid.JumpPower = 50
+        originalHumanoid.AutoRotate = true
+    end
+    
+    -- Переключаем камеру обратно на оригинал
+    camera.CameraSubject = originalCharacter:FindFirstChild("HumanoidRootPart") or originalCharacter
+    camera.CameraType = Enum.CameraType.Custom
+    
+    -- Уничтожаем клона
+    cloneCharacter:Destroy()
+    cloneCharacter = nil
+end
+
+-- ========== 7. ВКЛЮЧЕНИЕ ИНВИЗА ==========
+local function enableInvis()
+    if isInvisible then return end
+    
+    print("[INVIS] Включение...")
+    
+    -- Создаём клона
+    cloneCharacter = createClone()
+    
+    -- Экипируем оружие в клона
+    equipWeaponsToClone()
+    
+    -- Привязываем камеру к клону
+    attachCameraToClone()
+    
+    -- Прячем оригинальное тело
+    hideOriginalBody()
+    
+    -- Включаем полёт для клона
+    enableFlightForClone()
+    
+    isInvisible = true
+    print("[INVIS] Включён! Ты = полупрозрачный клон. V = выключить")
+end
+
+-- ========== 8. ВЫКЛЮЧЕНИЕ ИНВИЗА ==========
+local function disableInvis()
+    if not isInvisible then return end
+    
+    print("[INVIS] Выключение...")
+    
+    returnToNormal()
+    
+    isInvisible = false
+    print("[INVIS] Выключён! Ты вернулся на место клона")
+end
+
+-- ========== 9. ТОГГЛ ПО КЛАВИШЕ ==========
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if input.KeyCode == CONFIG.toggleKey then
+        if isInvisible then
+            disableInvis()
+        else
+            enableInvis()
+        end
+    end
 end)
+
+print("========================================")
+print("   INVIS SYSTEM v2 ЗАГРУЖЕН")
+print("========================================")
+print("Клавиша " .. tostring(CONFIG.toggleKey) .. " - вкл/выкл инвиз")
+print("")
+print("В режиме ИНВИЗА:")
+print("  - Ты = полупрозрачный клон (видишь себя)")
+print("  - Оригинальное тело спрятано далеко")
+print("  - Камера привязана к клону")
+print("  - Оружие держит клон")
+print("  - Управление: WASD + Пробел + Ctrl")
+print("========================================")
