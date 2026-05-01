@@ -1,164 +1,114 @@
---[[
-	INVIS GHOST v4.0 - AUTO INVIS ON DEATH/RESPAWN
-	Авто-инвиз включается когда ты умираешь и после респавна
-]]
-
-local VERSION = 4.0
-
-if _G.InvisGhostLoaded and _G.InvisGhostLoaded >= VERSION then
-    return
-end
-_G.InvisGhostLoaded = VERSION
+-- ПРОСТОЙ ИНВИЗ С АВТО-ВКЛЮЧЕНИЕМ ПРИ СМЕРТИ
+-- Работает гарантированно
 
 local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
-local UIS = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
 local plr = Players.LocalPlayer
 
 -- ========== ПЕРЕМЕННЫЕ ==========
-local invisOn = false
-local ghostOn = false
-local noclipOn = false
-local autoInvisOn = false  -- Авто-инвиз при смерти
-local ghostSpeed = 50
-local hidingPlace = nil
-local noclipConnection = nil
-local ghostConnection = nil
-local deathConnection = nil
-local respawnConnection = nil
-local isRespawning = false
+local invisActive = false
+local autoMode = false
+local hidingSpot = nil
 
--- ========== ФУНКЦИИ СОХРАНЕНИЯ ==========
-local function saveData()
+-- ========== СОЗДАНИЕ GUI ==========
+local screenGui = Instance.new("ScreenGui", CoreGui)
+screenGui.Name = "SimpleInvisGUI"
+
+local mainFrame = Instance.new("Frame", screenGui)
+mainFrame.Size = UDim2.new(0, 250, 0, 200)
+mainFrame.Position = UDim2.new(0.5, -125, 0.5, -100)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+mainFrame.BackgroundTransparency = 0.15
+mainFrame.Active = true
+mainFrame.Draggable = true
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
+
+-- Заголовок
+local title = Instance.new("TextLabel", mainFrame)
+title.Size = UDim2.new(1, 0, 0, 35)
+title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+title.Text = "SIMPLE INVIS"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.TextSize = 18
+title.Font = Enum.Font.GothomBold
+Instance.new("UICorner", title).CornerRadius = UDim.new(0, 12)
+
+-- Функция создания кнопки
+local function createBtn(text, y, color)
+    local btn = Instance.new("TextButton", mainFrame)
+    btn.Size = UDim2.new(0, 220, 0, 40)
+    btn.Position = UDim2.new(0, 15, 0, y)
+    btn.BackgroundColor3 = color or Color3.fromRGB(50, 50, 60)
+    btn.Text = text
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.TextSize = 15
+    btn.Font = Enum.Font.Gothom
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+    
+    btn.MouseEnter:Connect(function()
+        btn.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
+    end)
+    btn.MouseLeave:Connect(function()
+        btn.BackgroundColor3 = color or Color3.fromRGB(50, 50, 60)
+    end)
+    return btn
+end
+
+local invisBtn = createBtn("🔮 ВКЛ/ВЫКЛ ИНВИЗ (Z)", 45, Color3.fromRGB(80, 40, 120))
+local autoBtn = createBtn("🤖 АВТО-ИНВИЗ: ВЫКЛ (X)", 95, Color3.fromRGB(100, 60, 40))
+local unloadBtn = createBtn("❌ ВЫГРУЗИТЬ", 145, Color3.fromRGB(120, 40, 40))
+
+-- Статус
+local statusLabel = Instance.new("TextLabel", mainFrame)
+statusLabel.Size = UDim2.new(1, 0, 0, 25)
+statusLabel.Position = UDim2.new(0, 0, 1, -30)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "Статус: Ожидание"
+statusLabel.TextColor3 = Color3.new(1, 1, 1)
+statusLabel.TextSize = 12
+
+-- ========== ФУНКЦИЯ УВЕДОМЛЕНИЙ ==========
+local function notify(msg, isError)
     pcall(function()
-        if not isfolder then return end
-        if not isfolder("InvisGhostData") then makefolder("InvisGhostData") end
-        writefile("InvisGhostData/settings.txt", ghostSpeed .. "," .. tostring(autoInvisOn))
+        if CoreGui:FindFirstChild("Notice") then CoreGui.Notice:Destroy() end
+        local g = Instance.new("ScreenGui", CoreGui)
+        g.Name = "Notice"
+        local f = Instance.new("Frame", g)
+        f.Size = UDim2.new(0, 300, 0, 40)
+        f.Position = UDim2.new(0.5, -150, 0, 80)
+        f.BackgroundColor3 = isError and Color3.fromRGB(150, 0, 0) or Color3.fromRGB(0, 100, 0)
+        Instance.new("UICorner", f).CornerRadius = UDim.new(0, 10)
+        local l = Instance.new("TextLabel", f)
+        l.Size = UDim2.new(1, 0, 1, 0)
+        l.BackgroundTransparency = 1
+        l.Text = msg
+        l.TextColor3 = Color3.new(1, 1, 1)
+        l.TextSize = 14
+        task.delay(2, function() pcall(function() g:Destroy() end) end)
     end)
 end
 
-local function loadData()
-    pcall(function()
-        if isfile and isfile("InvisGhostData/settings.txt") then
-            local data = readfile("InvisGhostData/settings.txt")
-            local parts = {}
-            for part in string.gmatch(data, "[^,]+") do
-                table.insert(parts, part)
-            end
-            if #parts >= 1 then
-                ghostSpeed = tonumber(parts[1]) or 50
-            end
-            if #parts >= 2 then
-                autoInvisOn = parts[2] == "true"
-            end
-        end
-    end)
-end
-
-loadData()
-
--- ========== УВЕДОМЛЕНИЯ ==========
-local function showNotice(text, isError)
-    pcall(function()
-        if CoreGui:FindFirstChild("InvisNotice") then
-            CoreGui.InvisNotice:Destroy()
-        end
-        local gui = Instance.new("ScreenGui", CoreGui)
-        gui.Name = "InvisNotice"
-        gui.ResetOnSpawn = false
-        local frame = Instance.new("Frame", gui)
-        frame.Size = UDim2.new(0, 350, 0, 45)
-        frame.Position = UDim2.new(0.5, -175, 0, 60)
-        frame.BackgroundColor3 = isError and Color3.fromRGB(150, 30, 30) or Color3.fromRGB(30, 30, 40)
-        frame.BackgroundTransparency = 0.15
-        Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
-        local label = Instance.new("TextLabel", frame)
-        label.Size = UDim2.new(1, 0, 1, 0)
-        label.BackgroundTransparency = 1
-        label.Text = text
-        label.TextColor3 = Color3.new(1, 1, 1)
-        label.TextSize = 16
-        label.Font = Enum.Font.Gothom
-        task.delay(2.5, function()
-            pcall(function() gui:Destroy() end)
-        end)
-    end)
-end
-
--- ========== ОСНОВНАЯ ФУНКЦИЯ ИНВИЗА ==========
-local function setTransparency(char, val)
+-- ========== ОСНОВНЫЕ ФУНКЦИИ ==========
+local function makeTransparent(char, val)
     if not char then return end
     for _, part in pairs(char:GetDescendants()) do
-        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+        if part:IsA("BasePart") then
             part.Transparency = val
         end
     end
 end
 
-local function toggleInvis(silent)
+local function hideBody()
     local char = plr.Character
-    if not char then
-        if not silent then showNotice("Character not found!", true) end
-        return
-    end
-    
-    invisOn = not invisOn
-    
-    if invisOn then
-        -- Делаем полупрозрачным
-        setTransparency(char, 0.7)
-        
-        -- Сохраняем позицию и прячем тело
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            hidingPlace = hrp.CFrame
-            char:SetPrimaryPartCFrame(CFrame.new(0, 10000, 0))
-            for _, part in pairs(char:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.Anchored = true
-                end
-            end
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            if hum then
-                hum.PlatformStand = true
-            end
-        end
-        if not silent then showNotice("🔮 INVISIBLE ON") end
-    else
-        -- Возвращаем тело
-        if hidingPlace then
-            char:SetPrimaryPartCFrame(hidingPlace)
-        end
-        for _, part in pairs(char:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.Anchored = false
-                part.Transparency = 0
-            end
-        end
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum then
-            hum.PlatformStand = false
-        end
-        if not silent then showNotice("👁️ INVISIBLE OFF") end
-    end
-    
-    updateGUI()
-end
-
--- Принудительное включение инвиза (без переключения)
-local function forceInvisOn()
-    if invisOn then return end
-    local char = plr.Character
-    if not char then return end
-    
-    invisOn = true
-    setTransparency(char, 0.7)
+    if not char then return false end
     
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if hrp then
-        hidingPlace = hrp.CFrame
-        char:SetPrimaryPartCFrame(CFrame.new(0, 10000, 0))
+        hidingSpot = hrp.CFrame
+        -- Улетаем вверх
+        char:SetPrimaryPartCFrame(CFrame.new(0, 100000, 0))
+        -- Замораживаем
         for _, part in pairs(char:GetDescendants()) do
             if part:IsA("BasePart") then
                 part.Anchored = true
@@ -168,20 +118,17 @@ local function forceInvisOn()
         if hum then
             hum.PlatformStand = true
         end
+        return true
     end
-    showNotice("🤖 AUTO-INVIS: Activated (death/respawn)")
-    updateGUI()
+    return false
 end
 
--- Принудительное выключение инвиза
-local function forceInvisOff()
-    if not invisOn then return end
+local function returnBody()
     local char = plr.Character
     if not char then return end
     
-    invisOn = false
-    if hidingPlace then
-        char:SetPrimaryPartCFrame(hidingPlace)
+    if hidingSpot then
+        char:SetPrimaryPartCFrame(hidingSpot)
     end
     for _, part in pairs(char:GetDescendants()) do
         if part:IsA("BasePart") then
@@ -193,308 +140,152 @@ local function forceInvisOff()
     if hum then
         hum.PlatformStand = false
     end
-    updateGUI()
 end
 
--- ========== СИСТЕМА АВТО-ИНВИЗА ПРИ СМЕРТИ ==========
-local function setupDeathHook()
-    -- Отключаем старые подключения
-    if deathConnection then deathConnection:Disconnect() end
-    if respawnConnection then respawnConnection:Disconnect() end
-    
+local function enableInvis()
+    if invisActive then return end
     local char = plr.Character
-    if not char then return end
-    
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if not hum then return end
-    
-    -- Следим за смертью
-    deathConnection = hum.Died:Connect(function()
-        if autoInvisOn then
-            showNotice("💀 You died! Auto-Invis will activate on respawn...")
-            isRespawning = true
-            
-            -- Если инвиз был включен, выключаем (чтобы после респавна включить заново)
-            if invisOn then
-                forceInvisOff()
-            end
-        end
-    end)
-end
-
--- Следим за респавном (появление нового персонажа)
-plr.CharacterAdded:Connect(function(newChar)
-    task.wait(0.5) -- Ждём пока персонаж загрузится
-    
-    -- Настраиваем хук на смерть для нового персонажа
-    local hum = newChar:FindFirstChildOfClass("Humanoid")
-    if hum then
-        if deathConnection then deathConnection:Disconnect() end
-        deathConnection = hum.Died:Connect(function()
-            if autoInvisOn then
-                showNotice("💀 You died! Auto-Invis on respawn...")
-                isRespawning = true
-                if invisOn then
-                    forceInvisOff()
-                end
-            end
-        end)
+    if not char then
+        notify("Нет персонажа!", true)
+        return
     end
     
-    -- Если авто-инвиз включен и мы умерли - включаем инвиз при респавне
-    if autoInvisOn and isRespawning then
+    makeTransparent(char, 0.7)
+    if hideBody() then
+        invisActive = true
+        statusLabel.Text = "Статус: ИНВИЗ ВКЛ"
+        statusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+        invisBtn.BackgroundColor3 = Color3.fromRGB(60, 140, 60)
+        invisBtn.Text = "🔮 ИНВИЗ: ВКЛ (Z)"
+        notify("✅ ИНВИЗ ВКЛЮЧЁН")
+    end
+end
+
+local function disableInvis()
+    if not invisActive then return end
+    local char = plr.Character
+    if not char then
+        invisActive = false
+        return
+    end
+    
+    returnBody()
+    makeTransparent(char, 0)
+    invisActive = false
+    statusLabel.Text = "Статус: ИНВИЗ ВЫКЛ"
+    statusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    invisBtn.BackgroundColor3 = Color3.fromRGB(80, 40, 120)
+    invisBtn.Text = "🔮 ВКЛ/ВЫКЛ ИНВИЗ (Z)"
+    notify("❌ ИНВИЗ ВЫКЛЮЧЁН")
+end
+
+local function toggleInvis()
+    if invisActive then
+        disableInvis()
+    else
+        enableInvis()
+    end
+end
+
+-- ========== АВТО-ИНВИЗ ПРИ СМЕРТИ ==========
+local deathConn = nil
+local respawnConn = nil
+local pendingRespawn = false
+
+local function onCharacterAdded(newChar)
+    task.wait(0.5) -- Ждём загрузки
+    
+    -- Если был запланирован респавн (умерли) - включаем инвиз
+    if autoMode and pendingRespawn then
         task.wait(0.3)
-        forceInvisOn()
-        isRespawning = false
+        enableInvis()
+        pendingRespawn = false
+        notify("🤖 АВТО-ИНВИЗ: Включён после смерти")
     end
     
-    -- Восстанавливаем Ghost Speed если включен
-    if ghostOn then
-        task.wait(0.2)
-        local newHum = newChar:FindFirstChildOfClass("Humanoid")
-        if newHum then
-            newHum.WalkSpeed = ghostSpeed
-        end
-    end
-    
-    setupMovementHook()
-end)
-
--- ========== ОСТАЛЬНЫЕ ФУНКЦИИ ==========
-local function toggleGhost()
-    local hum = plr.Character and plr.Character:FindFirstChildOfClass("Humanoid")
-    ghostOn = not ghostOn
-    
-    if ghostOn then
-        if hum then hum.WalkSpeed = ghostSpeed end
-        if ghostConnection then ghostConnection:Disconnect() end
-        ghostConnection = RunService.Stepped:Connect(function()
-            local h = plr.Character and plr.Character:FindFirstChildOfClass("Humanoid")
-            if h and h.WalkSpeed ~= ghostSpeed then
-                h.WalkSpeed = ghostSpeed
-            end
-        end)
-        showNotice("⚡ GHOST SPEED: " .. ghostSpeed)
-    else
-        if ghostConnection then ghostConnection:Disconnect() end
-        if hum then hum.WalkSpeed = 16 end
-        showNotice("🐢 GHOST SPEED: OFF")
-    end
-    updateGUI()
-end
-
-local function toggleNoclip()
-    noclipOn = not noclipOn
-    
-    if noclipOn then
-        if noclipConnection then noclipConnection:Disconnect() end
-        noclipConnection = RunService.Stepped:Connect(function()
-            local char = plr.Character
-            if char then
-                for _, part in pairs(char:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = false
-                    end
+    -- Подписываемся на смерть нового персонажа
+    local hum = newChar:FindFirstChildOfClass("Humanoid")
+    if hum and deathConn then
+        deathConn:Disconnect()
+        deathConn = hum.Died:Connect(function()
+            if autoMode then
+                pendingRespawn = true
+                notify("💀 Вы умерли! Инвиз включится при респавне")
+                -- Если инвиз был включён - выключаем
+                if invisActive then
+                    disableInvis()
                 end
             end
         end)
-        showNotice("🚪 NOCLIP: ON")
+    end
+end
+
+-- Подписываемся на появление персонажа
+plr.CharacterAdded:Connect(onCharacterAdded)
+
+-- Если персонаж уже есть - настраиваем
+if plr.Character then
+    task.wait(0.5)
+    local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+    if hum then
+        deathConn = hum.Died:Connect(function()
+            if autoMode then
+                pendingRespawn = true
+                notify("💀 Вы умерли! Инвиз включится при респавне")
+                if invisActive then
+                    disableInvis()
+                end
+            end
+        end)
+    end
+end
+
+-- ========== ВКЛ/ВЫКЛ АВТО-РЕЖИМА ==========
+local function toggleAutoMode()
+    autoMode = not autoMode
+    
+    if autoMode then
+        autoBtn.Text = "🤖 АВТО-ИНВИЗ: ВКЛ (X)"
+        autoBtn.BackgroundColor3 = Color3.fromRGB(60, 140, 60)
+        notify("🤖 АВТО-ИНВИЗ ВКЛЮЧЁН (включится после смерти)")
+        statusLabel.Text = "Статус: АВТО-ИНВИЗ ВКЛ"
     else
-        if noclipConnection then noclipConnection:Disconnect() end
+        autoBtn.Text = "🤖 АВТО-ИНВИЗ: ВЫКЛ (X)"
+        autoBtn.BackgroundColor3 = Color3.fromRGB(100, 60, 40)
+        pendingRespawn = false
+        notify("🤖 АВТО-ИНВИЗ ВЫКЛЮЧЁН")
+        statusLabel.Text = "Статус: АВТО-ИНВИЗ ВЫКЛ"
+    end
+end
+
+-- ========== ВЫГРУЗКА ==========
+local function unload()
+    if deathConn then deathConn:Disconnect() end
+    pcall(function() screenGui:Destroy() end)
+    if invisActive then
+        returnBody()
         local char = plr.Character
         if char then
-            for _, part in pairs(char:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = true
-                end
-            end
+            makeTransparent(char, 0)
         end
-        showNotice("🚫 NOCLIP: OFF")
     end
-    updateGUI()
-end
-
-local function toggleAutoInvis()
-    autoInvisOn = not autoInvisOn
-    saveData()
-    
-    if autoInvisOn then
-        showNotice("🤖 AUTO-INVIS: ON (activates on death/respawn)")
-        -- Если персонаж уже есть, настраиваем хук
-        if plr.Character then
-            setupDeathHook()
-        end
-    else
-        showNotice("🤖 AUTO-INVIS: OFF")
-        if deathConnection then deathConnection:Disconnect() end
-        isRespawning = false
-    end
-    updateGUI()
-end
-
--- Хук на движение (для сброса таймера не нужен больше, но оставим для других функций)
-local function setupMovementHook()
-    -- Не нужно для авто-инвиза при смерти, но оставим для совместимости
-end
-
--- ========== СОЗДАНИЕ GUI ==========
-local screenGui = Instance.new("ScreenGui", CoreGui)
-screenGui.Name = "InvisGhostGUI"
-screenGui.ResetOnSpawn = false
-
-local mainFrame = Instance.new("Frame", screenGui)
-mainFrame.Size = UDim2.new(0, 260, 0, 280)
-mainFrame.Position = UDim2.new(0.5, -130, 0.5, -140)
-mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-mainFrame.BackgroundTransparency = 0.1
-mainFrame.Active = true
-mainFrame.Draggable = true
-Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
-
--- Заголовок
-local title = Instance.new("TextLabel", mainFrame)
-title.Size = UDim2.new(1, 0, 0, 35)
-title.Position = UDim2.new(0, 0, 0, 0)
-title.BackgroundColor3 = Color3.fromRGB(0, 120, 200)
-title.Text = "INVIS GHOST v" .. VERSION
-title.TextColor3 = Color3.new(1, 1, 1)
-title.TextSize = 18
-title.Font = Enum.Font.GothomBold
-title.BackgroundTransparency = 0.2
-Instance.new("UICorner", title).CornerRadius = UDim.new(0, 12)
-
-local function createButton(text, yPos, color)
-    local btn = Instance.new("TextButton", mainFrame)
-    btn.Size = UDim2.new(0, 240, 0, 38)
-    btn.Position = UDim2.new(0, 10, 0, yPos)
-    btn.BackgroundColor3 = color or Color3.fromRGB(45, 45, 55)
-    btn.Text = text
-    btn.TextColor3 = Color3.new(1, 1, 1)
-    btn.TextSize = 14
-    btn.Font = Enum.Font.Gothom
-    btn.BorderSizePixel = 0
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
-    
-    btn.MouseEnter:Connect(function()
-        btn.BackgroundColor3 = Color3.fromRGB(65, 65, 75)
-    end)
-    btn.MouseLeave:Connect(function()
-        btn.BackgroundColor3 = color or Color3.fromRGB(45, 45, 55)
-    end)
-    
-    return btn
-end
-
-local invisBtn = createButton("🔮 TOGGLE INVIS (Z)", 45, Color3.fromRGB(80, 40, 120))
-local ghostBtn = createButton("⚡ TOGGLE GHOST SPEED (B)", 95, Color3.fromRGB(40, 80, 120))
-local noclipBtn = createButton("🚪 TOGGLE NOCLIP (N)", 145, Color3.fromRGB(40, 100, 60))
-local autoBtn = createButton("🤖 AUTO-INVIS: OFF (M)", 195, Color3.fromRGB(100, 60, 40))
-local unloadBtn = createButton("❌ UNLOAD SCRIPT (K)", 240, Color3.fromRGB(120, 40, 40))
-
--- Speed box
-local speedBox = Instance.new("TextBox", mainFrame)
-speedBox.Size = UDim2.new(0, 80, 0, 25)
-speedBox.Position = UDim2.new(0, 170, 0, 245)
-speedBox.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-speedBox.Text = tostring(ghostSpeed)
-speedBox.TextColor3 = Color3.new(1, 1, 1)
-Instance.new("UICorner", speedBox).CornerRadius = UDim.new(0, 6)
-
-local speedLabel = Instance.new("TextLabel", mainFrame)
-speedLabel.Size = UDim2.new(0, 100, 0, 25)
-speedLabel.Position = UDim2.new(0, 10, 0, 245)
-speedLabel.BackgroundTransparency = 1
-speedLabel.Text = "Speed: " .. ghostSpeed
-speedLabel.TextColor3 = Color3.new(1, 1, 1)
-speedLabel.TextSize = 12
-speedLabel.TextXAlignment = Enum.TextXAlignment.Left
-
-speedBox.FocusLost:Connect(function()
-    local val = tonumber(speedBox.Text)
-    if val and val > 0 and val < 500 then
-        ghostSpeed = val
-        speedLabel.Text = "Speed: " .. ghostSpeed
-        if ghostOn then
-            local hum = plr.Character and plr.Character:FindFirstChildOfClass("Humanoid")
-            if hum then hum.WalkSpeed = ghostSpeed end
-        end
-        saveData()
-    else
-        speedBox.Text = tostring(ghostSpeed)
-    end
-end)
-
--- ========== ОБНОВЛЕНИЕ GUI ==========
-local function updateGUI()
-    if invisOn then
-        invisBtn.Text = "🔮 INVISIBLE: ON (Z)"
-        invisBtn.BackgroundColor3 = Color3.fromRGB(60, 140, 60)
-    else
-        invisBtn.Text = "🔮 TOGGLE INVIS (Z)"
-        invisBtn.BackgroundColor3 = Color3.fromRGB(80, 40, 120)
-    end
-    
-    if ghostOn then
-        ghostBtn.Text = "⚡ GHOST: ON (" .. ghostSpeed .. ") (B)"
-        ghostBtn.BackgroundColor3 = Color3.fromRGB(60, 140, 60)
-    else
-        ghostBtn.Text = "⚡ TOGGLE GHOST SPEED (B)"
-        ghostBtn.BackgroundColor3 = Color3.fromRGB(40, 80, 120)
-    end
-    
-    if noclipOn then
-        noclipBtn.Text = "🚪 NOCLIP: ON (N)"
-        noclipBtn.BackgroundColor3 = Color3.fromRGB(60, 140, 60)
-    else
-        noclipBtn.Text = "🚪 TOGGLE NOCLIP (N)"
-        noclipBtn.BackgroundColor3 = Color3.fromRGB(40, 100, 60)
-    end
-    
-    if autoInvisOn then
-        autoBtn.Text = "🤖 AUTO-INVIS: ON (M) [on death]"
-        autoBtn.BackgroundColor3 = Color3.fromRGB(60, 140, 60)
-    else
-        autoBtn.Text = "🤖 AUTO-INVIS: OFF (M)"
-        autoBtn.BackgroundColor3 = Color3.fromRGB(100, 60, 40)
-    end
+    _G.SimpleInvisLoaded = nil
+    notify("Скрипт выгружен")
 end
 
 -- ========== ПРИВЯЗКА КНОПОК ==========
 invisBtn.MouseButton1Click:Connect(toggleInvis)
-ghostBtn.MouseButton1Click:Connect(toggleGhost)
-noclipBtn.MouseButton1Click:Connect(toggleNoclip)
-autoBtn.MouseButton1Click:Connect(toggleAutoInvis)
-unloadBtn.MouseButton1Click:Connect(function()
-    pcall(function() screenGui:Destroy() end)
-    if noclipConnection then noclipConnection:Disconnect() end
-    if ghostConnection then ghostConnection:Disconnect() end
-    if deathConnection then deathConnection:Disconnect() end
-    _G.InvisGhostLoaded = nil
-    showNotice("Script unloaded")
-end)
+autoBtn.MouseButton1Click:Connect(toggleAutoMode)
+unloadBtn.MouseButton1Click:Connect(unload)
 
 -- ========== ХОТКЕИ ==========
-UIS.InputBegan:Connect(function(input, gpe)
+UserInputService.InputBegan:Connect(function(input, gpe)
     if gpe then return end
-    local key = input.KeyCode
-    if key == Enum.KeyCode.Z then
+    if input.KeyCode == Enum.KeyCode.Z then
         toggleInvis()
-    elseif key == Enum.KeyCode.B then
-        toggleGhost()
-    elseif key == Enum.KeyCode.N then
-        toggleNoclip()
-    elseif key == Enum.KeyCode.M then
-        toggleAutoInvis()
-    elseif key == Enum.KeyCode.K then
-        mainFrame.Visible = not mainFrame.Visible
+    elseif input.KeyCode == Enum.KeyCode.X then
+        toggleAutoMode()
     end
 end)
 
--- ========== ЗАПУСК ==========
--- Настраиваем хук на смерть если персонаж уже есть
-if plr.Character then
-    setupDeathHook()
-end
-
-updateGUI()
-showNotice("INVIS GHOST v" .. VERSION .. " | M = Auto-Invis on death")
+notify("Скрипт загружен! Z - Инвиз | X - Авто-режим")
