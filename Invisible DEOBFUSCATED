@@ -1,7 +1,7 @@
 --[[
 	WARNING: Heads up! This script has not been verified by ScriptBlox. Use at your own risk!
 ]]
-local VERSION = 1.5
+local VERSION = 1.6
 
 if _G.InvisGhostLoaded and _G.InvisGhostLoaded >= VERSION then
     return
@@ -16,6 +16,7 @@ local plr = Players.LocalPlayer
 
 local SETTINGS_FOLDER = "FeInvisibleOld"
 local SETTINGS_FILE = SETTINGS_FOLDER .. "/ghostspeed.txt"
+local AUTO_SETTINGS_FILE = SETTINGS_FOLDER .. "/autosettings.txt"
 
 local function saveSpeed(speed)
     if isfolder and makefolder and writefile then
@@ -36,19 +37,53 @@ local function loadSpeed()
     return 50
 end
 
+local function saveAutoSettings(enabled, delay)
+    if isfolder and makefolder and writefile then
+        if not isfolder(SETTINGS_FOLDER) then
+            makefolder(SETTINGS_FOLDER)
+        end
+        writefile(AUTO_SETTINGS_FILE, enabled .. "," .. delay)
+    end
+end
+
+local function loadAutoSettings()
+    if isfile and readfile and isfile(AUTO_SETTINGS_FILE) then
+        local data = readfile(AUTO_SETTINGS_FILE)
+        local parts = {}
+        for part in string.gmatch(data, "[^,]+") do
+            table.insert(parts, part)
+        end
+        if #parts >= 2 then
+            return parts[1] == "true", tonumber(parts[2]) or 3
+        end
+    end
+    return false, 3
+end
+
 local invisOn = false
 local ghostOn = false
 local noclipOn = false
+local autoInvisOn = false
+local autoInvisDelay = 3
 local ghostSpeed = loadSpeed()
 local uiHidden = false
+
+-- Загружаем авто настройки
+autoInvisOn, autoInvisDelay = loadAutoSettings()
+
+-- Переменные для авто-инвиза
+local lastMovementTime = tick()
+local autoInvisTimerConn = nil
+local autoInvisCheckConn = nil
+local wasInvisBeforeAuto = false
 
 local sg = Instance.new("ScreenGui", CoreguiM)
 sg.Name = "InvisGhostUI"
 sg.ResetOnSpawn = false
 
 local mainFrame = Instance.new("Frame", sg)
-mainFrame.Size = UDim2.new(0, 220, 0, 200)
-mainFrame.Position = UDim2.new(0.5, -110, 0.5, -100)
+mainFrame.Size = UDim2.new(0, 220, 0, 270)
+mainFrame.Position = UDim2.new(0.5, -110, 0.5, -135)
 mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 mainFrame.Active = true
 mainFrame.Draggable = true
@@ -68,11 +103,12 @@ end
 local invisBtn = makeButton("Toggle Invisibility 👻", UDim2.new(0, 10, 0, 10))
 local ghostBtn = makeButton("Toggle Ghost Speed ⚡", UDim2.new(0, 10, 0, 50))
 local noclipBtn = makeButton("Toggle Noclip 🚪", UDim2.new(0, 10, 0, 90))
-local unloadBtn = makeButton("Unload ❌", UDim2.new(0, 10, 0, 170))
+local autoBtn = makeButton("Auto-Invis: OFF 🤖", UDim2.new(0, 10, 0, 130))
+local unloadBtn = makeButton("Unload ❌", UDim2.new(0, 10, 0, 230))
 
 local speedBox = Instance.new("TextBox", mainFrame)
 speedBox.Size = UDim2.new(0, 200, 0, 30)
-speedBox.Position = UDim2.new(0, 10, 0, 130)
+speedBox.Position = UDim2.new(0, 10, 0, 190)
 speedBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 speedBox.TextColor3 = Color3.new(1, 1, 1)
 speedBox.Text = tostring(ghostSpeed)
@@ -138,11 +174,120 @@ local function toggleInvis()
             if workspace:FindFirstChild("invischair") then
                 workspace.invischair:Destroy()
             end
---m
             showNotice("Invisibility Disabled")
         end
     end
 end
+
+-- ========== СИСТЕМА АВТО-ИНВИЗА ==========
+local function startAutoInvisTimer()
+    if autoInvisTimerConn then
+        autoInvisTimerConn:Disconnect()
+        autoInvisTimerConn = nil
+    end
+    
+    autoInvisTimerConn = RunService.Stepped:Connect(function()
+        if not autoInvisOn then return end
+        if invisOn then return end  -- Уже в инвизе
+        
+        local currentTime = tick()
+        local char = plr.Character
+        local isMoving = false
+        
+        if char then
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            
+            if hrp and hrp.AssemblyLinearVelocity.Magnitude > 1 then
+                isMoving = true
+                lastMovementTime = currentTime
+            elseif hum and hum.Sit then
+                isMoving = true
+                lastMovementTime = currentTime
+            end
+        end
+        
+        -- Если не двигаемся дольше задержки - включаем инвиз
+        if not isMoving and (currentTime - lastMovementTime) >= autoInvisDelay then
+            if not invisOn then
+                toggleInvis()
+                wasInvisBeforeAuto = true
+                showNotice("🤖 AUTO-INVIS: Activated (idle for " .. autoInvisDelay .. " sec)")
+            end
+        end
+    end)
+end
+
+local function stopAutoInvisTimer()
+    if autoInvisTimerConn then
+        autoInvisTimerConn:Disconnect()
+        autoInvisTimerConn = nil
+    end
+end
+
+local function updateAutoButtonText()
+    if autoInvisOn then
+        autoBtn.Text = "Auto-Invis: ON 🤖 (" .. autoInvisDelay .. "s)"
+        autoBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 0)
+        startAutoInvisTimer()
+    else
+        autoBtn.Text = "Auto-Invis: OFF 🤖"
+        autoBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        stopAutoInvisTimer()
+    end
+end
+
+local function toggleAutoInvis()
+    autoInvisOn = not autoInvisOn
+    saveAutoSettings(autoInvisOn, autoInvisDelay)
+    updateAutoButtonText()
+    
+    if not autoInvisOn and wasInvisBeforeAuto and invisOn then
+        -- Если авто-инвиз выключен и мы были в инвизе от авто - выключаем
+        toggleInvis()
+        wasInvisBeforeAuto = false
+        showNotice("🤖 AUTO-INVIS: Disabled")
+    elseif autoInvisOn then
+        lastMovementTime = tick()
+        showNotice("🤖 AUTO-INVIS: Enabled (" .. autoInvisDelay .. " sec idle)")
+    end
+end
+
+local function setAutoDelay(delay)
+    autoInvisDelay = math.clamp(delay, 1, 30)
+    saveAutoSettings(autoInvisOn, autoInvisDelay)
+    updateAutoButtonText()
+    showNotice("🤖 Auto-Invis delay set to " .. autoInvisDelay .. " seconds")
+end
+
+-- Хук на движение для сброса таймера при движении
+local function setupMovementHook()
+    local char = plr.Character
+    if char then
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            hrp:GetPropertyChangedSignal("AssemblyLinearVelocity"):Connect(function()
+                if autoInvisOn and invisOn and wasInvisBeforeAuto then
+                    if hrp.AssemblyLinearVelocity.Magnitude > 1 then
+                        -- Начали двигаться - выключаем инвиз
+                        toggleInvis()
+                        wasInvisBeforeAuto = false
+                        lastMovementTime = tick()
+                        showNotice("🤖 AUTO-INVIS: Deactivated (movement detected)")
+                    end
+                end
+            end)
+        end
+    end
+end
+
+-- Подписываемся на добавление персонажа
+plr.CharacterAdded:Connect(function()
+    setupMovementHook()
+    lastMovementTime = tick()
+end)
+
+-- ========== ОСТАЛЬНЫЕ ФУНКЦИИ ==========
 
 local ghostEnforceConn
 local function toggleGhost()
@@ -202,7 +347,6 @@ local function toggleNoclip()
     end
 end
 
-local keybindConn
 local function unload()
     if sg then
         pcall(function() sg:Destroy() end)
@@ -213,13 +357,13 @@ local function unload()
         pcall(function() noclipConn:Disconnect() end)
         noclipConn = nil
     end
-    if keybindConn then
-        pcall(function() keybindConn:Disconnect() end)
-        keybindConn = nil
-    end
     if ghostEnforceConn then
         pcall(function() ghostEnforceConn:Disconnect() end)
         ghostEnforceConn = nil
+    end
+    if autoInvisTimerConn then
+        pcall(function() autoInvisTimerConn:Disconnect() end)
+        autoInvisTimerConn = nil
     end
     local char = plr.Character
     if char then
@@ -240,6 +384,7 @@ local function unload()
     invisOn = false
     ghostOn = false
     noclipOn = false
+    autoInvisOn = false
     uiHidden = false
     showNotice("Invis Ghost Unloaded")
 end
@@ -286,9 +431,11 @@ local function confirmUnload()
     end)
 end
 
+-- ========== ПРИВЯЗКА КНОПОК ==========
 invisBtn.MouseButton1Click:Connect(toggleInvis)
 ghostBtn.MouseButton1Click:Connect(toggleGhost)
 noclipBtn.MouseButton1Click:Connect(toggleNoclip)
+autoBtn.MouseButton1Click:Connect(toggleAutoInvis)
 unloadBtn.MouseButton1Click:Connect(confirmUnload)
 
 speedBox.FocusLost:Connect(function(enter)
@@ -311,7 +458,8 @@ speedBox.FocusLost:Connect(function(enter)
     end
 end)
 
-keybindConn = UIS.InputBegan:Connect(function(input, gpe)
+-- ========== ХОТКЕИ ==========
+local keybindConn = UIS.InputBegan:Connect(function(input, gpe)
     if gpe then return end
     if input.KeyCode == Enum.KeyCode.Z then
         toggleInvis()
@@ -319,10 +467,20 @@ keybindConn = UIS.InputBegan:Connect(function(input, gpe)
         toggleGhost()
     elseif input.KeyCode == Enum.KeyCode.N then
         toggleNoclip()
+    elseif input.KeyCode == Enum.KeyCode.M then
+        toggleAutoInvis()
     elseif input.KeyCode == Enum.KeyCode.K then
         uiHidden = not uiHidden
         mainFrame.Visible = not uiHidden
     end
 end)
---DONT SKID Llitte bro just dont its my 
---2025/9/6
+
+-- ========== ИНИЦИАЛИЗАЦИЯ ==========
+setupMovementHook()
+updateAutoButtonText()
+
+if plr.Character then
+    lastMovementTime = tick()
+end
+
+showNotice("Invis Ghost v" .. VERSION .. " Loaded | M - Auto Invis")
