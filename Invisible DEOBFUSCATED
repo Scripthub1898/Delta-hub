@@ -1,291 +1,59 @@
--- ПРОСТОЙ ИНВИЗ С АВТО-ВКЛЮЧЕНИЕМ ПРИ СМЕРТИ
--- Работает гарантированно
+--[[
+	WARNING: Heads up! This script has not been verified by ScriptBlox. Use at your own risk!
+]]
+local RS = game:GetService("ReplicatedStorage")
+local plr = game:GetService("Players").LocalPlayer
+local EF = RS["E&F"]
 
-local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
-local CoreGui = game:GetService("CoreGui")
-local plr = Players.LocalPlayer
+pcall(function() plr.PlayerGui:FindFirstChild("EFINF"):Destroy() end)
+local gui = Instance.new("ScreenGui"); gui.Name="EFINF"; gui.ResetOnSpawn=false; gui.Parent=plr.PlayerGui
 
--- ========== ПЕРЕМЕННЫЕ ==========
-local invisActive = false
-local autoMode = false
-local hidingSpot = nil
+local main = Instance.new("Frame"); main.Size=UDim2.new(0,220,0,90); main.Position=UDim2.new(0.5,-110,0,20)
+main.BackgroundColor3=Color3.fromRGB(15,15,25); main.BorderSizePixel=0; main.Parent=gui
 
--- ========== СОЗДАНИЕ GUI ==========
-local screenGui = Instance.new("ScreenGui", CoreGui)
-screenGui.Name = "SimpleInvisGUI"
-
-local mainFrame = Instance.new("Frame", screenGui)
-mainFrame.Size = UDim2.new(0, 250, 0, 200)
-mainFrame.Position = UDim2.new(0.5, -125, 0.5, -100)
-mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-mainFrame.BackgroundTransparency = 0.15
-mainFrame.Active = true
-mainFrame.Draggable = true
-Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
-
--- Заголовок
-local title = Instance.new("TextLabel", mainFrame)
-title.Size = UDim2.new(1, 0, 0, 35)
-title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
-title.Text = "SIMPLE INVIS"
-title.TextColor3 = Color3.new(1, 1, 1)
-title.TextSize = 18
-title.Font = Enum.Font.GothomBold
-Instance.new("UICorner", title).CornerRadius = UDim.new(0, 12)
-
--- Функция создания кнопки
-local function createBtn(text, y, color)
-    local btn = Instance.new("TextButton", mainFrame)
-    btn.Size = UDim2.new(0, 220, 0, 40)
-    btn.Position = UDim2.new(0, 15, 0, y)
-    btn.BackgroundColor3 = color or Color3.fromRGB(50, 50, 60)
-    btn.Text = text
-    btn.TextColor3 = Color3.new(1, 1, 1)
-    btn.TextSize = 15
-    btn.Font = Enum.Font.Gothom
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
-    
-    btn.MouseEnter:Connect(function()
-        btn.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
-    end)
-    btn.MouseLeave:Connect(function()
-        btn.BackgroundColor3 = color or Color3.fromRGB(50, 50, 60)
-    end)
-    return btn
-end
-
-local invisBtn = createBtn("🔮 ВКЛ/ВЫКЛ ИНВИЗ (Z)", 45, Color3.fromRGB(80, 40, 120))
-local autoBtn = createBtn("🤖 АВТО-ИНВИЗ: ВЫКЛ (X)", 95, Color3.fromRGB(100, 60, 40))
-local unloadBtn = createBtn("❌ ВЫГРУЗИТЬ", 145, Color3.fromRGB(120, 40, 40))
-
--- Статус
-local statusLabel = Instance.new("TextLabel", mainFrame)
-statusLabel.Size = UDim2.new(1, 0, 0, 25)
-statusLabel.Position = UDim2.new(0, 0, 1, -30)
-statusLabel.BackgroundTransparency = 1
-statusLabel.Text = "Статус: Ожидание"
-statusLabel.TextColor3 = Color3.new(1, 1, 1)
-statusLabel.TextSize = 12
-
--- ========== ФУНКЦИЯ УВЕДОМЛЕНИЙ ==========
-local function notify(msg, isError)
-    pcall(function()
-        if CoreGui:FindFirstChild("Notice") then CoreGui.Notice:Destroy() end
-        local g = Instance.new("ScreenGui", CoreGui)
-        g.Name = "Notice"
-        local f = Instance.new("Frame", g)
-        f.Size = UDim2.new(0, 300, 0, 40)
-        f.Position = UDim2.new(0.5, -150, 0, 80)
-        f.BackgroundColor3 = isError and Color3.fromRGB(150, 0, 0) or Color3.fromRGB(0, 100, 0)
-        Instance.new("UICorner", f).CornerRadius = UDim.new(0, 10)
-        local l = Instance.new("TextLabel", f)
-        l.Size = UDim2.new(1, 0, 1, 0)
-        l.BackgroundTransparency = 1
-        l.Text = msg
-        l.TextColor3 = Color3.new(1, 1, 1)
-        l.TextSize = 14
-        task.delay(2, function() pcall(function() g:Destroy() end) end)
-    end)
-end
-
--- ========== ОСНОВНЫЕ ФУНКЦИИ ==========
-local function makeTransparent(char, val)
-    if not char then return end
-    for _, part in pairs(char:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part.Transparency = val
-        end
+local dr,ds,sp
+main.InputBegan:Connect(function(i)
+    if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+        dr=true;ds=i.Position;sp=main.Position
+        i.Changed:Connect(function() if i.UserInputState==Enum.UserInputState.End then dr=false end end)
     end
-end
-
-local function hideBody()
-    local char = plr.Character
-    if not char then return false end
-    
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if hrp then
-        hidingSpot = hrp.CFrame
-        -- Улетаем вверх
-        char:SetPrimaryPartCFrame(CFrame.new(0, 100000, 0))
-        -- Замораживаем
-        for _, part in pairs(char:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.Anchored = true
-            end
-        end
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum then
-            hum.PlatformStand = true
-        end
-        return true
-    end
-    return false
-end
-
-local function returnBody()
-    local char = plr.Character
-    if not char then return end
-    
-    if hidingSpot then
-        char:SetPrimaryPartCFrame(hidingSpot)
-    end
-    for _, part in pairs(char:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part.Anchored = false
-            part.Transparency = 0
-        end
-    end
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if hum then
-        hum.PlatformStand = false
-    end
-end
-
-local function enableInvis()
-    if invisActive then return end
-    local char = plr.Character
-    if not char then
-        notify("Нет персонажа!", true)
-        return
-    end
-    
-    makeTransparent(char, 0.7)
-    if hideBody() then
-        invisActive = true
-        statusLabel.Text = "Статус: ИНВИЗ ВКЛ"
-        statusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-        invisBtn.BackgroundColor3 = Color3.fromRGB(60, 140, 60)
-        invisBtn.Text = "🔮 ИНВИЗ: ВКЛ (Z)"
-        notify("✅ ИНВИЗ ВКЛЮЧЁН")
-    end
-end
-
-local function disableInvis()
-    if not invisActive then return end
-    local char = plr.Character
-    if not char then
-        invisActive = false
-        return
-    end
-    
-    returnBody()
-    makeTransparent(char, 0)
-    invisActive = false
-    statusLabel.Text = "Статус: ИНВИЗ ВЫКЛ"
-    statusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    invisBtn.BackgroundColor3 = Color3.fromRGB(80, 40, 120)
-    invisBtn.Text = "🔮 ВКЛ/ВЫКЛ ИНВИЗ (Z)"
-    notify("❌ ИНВИЗ ВЫКЛЮЧЁН")
-end
-
-local function toggleInvis()
-    if invisActive then
-        disableInvis()
-    else
-        enableInvis()
-    end
-end
-
--- ========== АВТО-ИНВИЗ ПРИ СМЕРТИ ==========
-local deathConn = nil
-local respawnConn = nil
-local pendingRespawn = false
-
-local function onCharacterAdded(newChar)
-    task.wait(0.5) -- Ждём загрузки
-    
-    -- Если был запланирован респавн (умерли) - включаем инвиз
-    if autoMode and pendingRespawn then
-        task.wait(0.3)
-        enableInvis()
-        pendingRespawn = false
-        notify("🤖 АВТО-ИНВИЗ: Включён после смерти")
-    end
-    
-    -- Подписываемся на смерть нового персонажа
-    local hum = newChar:FindFirstChildOfClass("Humanoid")
-    if hum and deathConn then
-        deathConn:Disconnect()
-        deathConn = hum.Died:Connect(function()
-            if autoMode then
-                pendingRespawn = true
-                notify("💀 Вы умерли! Инвиз включится при респавне")
-                -- Если инвиз был включён - выключаем
-                if invisActive then
-                    disableInvis()
-                end
-            end
-        end)
-    end
-end
-
--- Подписываемся на появление персонажа
-plr.CharacterAdded:Connect(onCharacterAdded)
-
--- Если персонаж уже есть - настраиваем
-if plr.Character then
-    task.wait(0.5)
-    local hum = plr.Character:FindFirstChildOfClass("Humanoid")
-    if hum then
-        deathConn = hum.Died:Connect(function()
-            if autoMode then
-                pendingRespawn = true
-                notify("💀 Вы умерли! Инвиз включится при респавне")
-                if invisActive then
-                    disableInvis()
-                end
-            end
-        end)
-    end
-end
-
--- ========== ВКЛ/ВЫКЛ АВТО-РЕЖИМА ==========
-local function toggleAutoMode()
-    autoMode = not autoMode
-    
-    if autoMode then
-        autoBtn.Text = "🤖 АВТО-ИНВИЗ: ВКЛ (X)"
-        autoBtn.BackgroundColor3 = Color3.fromRGB(60, 140, 60)
-        notify("🤖 АВТО-ИНВИЗ ВКЛЮЧЁН (включится после смерти)")
-        statusLabel.Text = "Статус: АВТО-ИНВИЗ ВКЛ"
-    else
-        autoBtn.Text = "🤖 АВТО-ИНВИЗ: ВЫКЛ (X)"
-        autoBtn.BackgroundColor3 = Color3.fromRGB(100, 60, 40)
-        pendingRespawn = false
-        notify("🤖 АВТО-ИНВИЗ ВЫКЛЮЧЁН")
-        statusLabel.Text = "Статус: АВТО-ИНВИЗ ВЫКЛ"
-    end
-end
-
--- ========== ВЫГРУЗКА ==========
-local function unload()
-    if deathConn then deathConn:Disconnect() end
-    pcall(function() screenGui:Destroy() end)
-    if invisActive then
-        returnBody()
-        local char = plr.Character
-        if char then
-            makeTransparent(char, 0)
-        end
-    end
-    _G.SimpleInvisLoaded = nil
-    notify("Скрипт выгружен")
-end
-
--- ========== ПРИВЯЗКА КНОПОК ==========
-invisBtn.MouseButton1Click:Connect(toggleInvis)
-autoBtn.MouseButton1Click:Connect(toggleAutoMode)
-unloadBtn.MouseButton1Click:Connect(unload)
-
--- ========== ХОТКЕИ ==========
-UserInputService.InputBegan:Connect(function(input, gpe)
-    if gpe then return end
-    if input.KeyCode == Enum.KeyCode.Z then
-        toggleInvis()
-    elseif input.KeyCode == Enum.KeyCode.X then
-        toggleAutoMode()
+end)
+game:GetService("UserInputService").InputChanged:Connect(function(i)
+    if dr and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
+        local d=i.Position-ds; main.Position=UDim2.new(sp.X.Scale,sp.X.Offset+d.X,sp.Y.Scale,sp.Y.Offset+d.Y)
     end
 end)
 
-notify("Скрипт загружен! Z - Инвиз | X - Авто-режим")
+local t=Instance.new("TextLabel",main); t.Size=UDim2.new(1,-30,0,25); t.BackgroundColor3=Color3.fromRGB(60,30,120)
+t.BorderSizePixel=0; t.Text=" Get Fat to Splash"; t.TextColor3=Color3.fromRGB(220,220,220); t.TextSize=13; t.Font=Enum.Font.GothamBold; t.TextXAlignment=Enum.TextXAlignment.Left
+local x=Instance.new("TextButton",main); x.Size=UDim2.new(0,25,0,25); x.Position=UDim2.new(1,-27,0,0)
+x.BackgroundColor3=Color3.fromRGB(180,50,50); x.Text="X"; x.TextColor3=Color3.fromRGB(255,255,255); x.TextSize=12; x.Font=Enum.Font.GothamBold; x.BorderSizePixel=0
+x.MouseButton1Click:Connect(function() gui:Destroy() end)
+
+local cf=Instance.new("Frame",main); cf.Size=UDim2.new(1,-10,1,-30); cf.Position=UDim2.new(0,5,0,28); cf.BackgroundTransparency=1
+Instance.new("UIListLayout",cf).Padding=UDim.new(0,4)
+
+local function makeBtn(name, callback)
+    local b=Instance.new("TextButton",cf); b.Size=UDim2.new(1,0,0,28)
+    b.BackgroundColor3=Color3.fromRGB(40,40,55); b.Text=name
+    b.TextColor3=Color3.fromRGB(200,200,200); b.TextSize=12; b.Font=Enum.Font.GothamBold; b.BorderSizePixel=0
+    b.MouseButton1Click:Connect(function()
+        b.BackgroundColor3=Color3.fromRGB(60,30,120)
+        pcall(callback)
+        task.wait(0.3); b.BackgroundColor3=Color3.fromRGB(40,40,55)
+    end)
+end
+
+makeBtn("FixINF Rebirth", function()
+    EF.Eco.SetEcoRE:FireServer("rebirth", 1)
+end)
+makeBtn("FixINF Fat", function()
+    EF.Eco.AddEcoRE:FireServer("exp", 1)
+end)
+
+makeBtn("FixINF Coins", function()
+    EF.Eco.AddEcoRE:FireServer("coin", 1)
+end)
+makeBtn("FixINF Fastfood", function()
+    EF.Eco.AddEcoRE:FireServer("fast", 1)
+end)
